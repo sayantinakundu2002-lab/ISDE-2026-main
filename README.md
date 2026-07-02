@@ -97,7 +97,7 @@ Clone the project and enter the repository:
 
 ```bash
 git clone https://github.com/sayantinakundu2002-lab/ISDE-2026.git
-cd ISDE-2026
+cd ISDE-2026-main
 ```
 
 Create and activate a Python virtual environment:
@@ -109,6 +109,7 @@ python -m venv venv
 
 # macOS or Linux
 python3 -m venv venv
+Set-ExecutionPolicy Bypass -Scope Process
 source venv/bin/activate
 ```
 
