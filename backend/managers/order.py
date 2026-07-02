@@ -1,0 +1,171 @@
+# backend/managers/order.py
+import random
+import logging
+from datetime import datetime
+from typing import Optional
+
+from backend.patterns.singleton import SingletonMeta
+from backend.patterns.state import Order, OrderState
+
+
+class OrderManager(metaclass=SingletonMeta):
+    def __init__(self):
+        self.orders = {}
+        self.load_from_db()
+
+    def load_from_db(self):
+        try:
+            from backend.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Fetch all orders
+            cursor.execute("SELECT * FROM orders")
+            orders_rows = cursor.fetchall()
+            
+            self.orders.clear()
+            for r in orders_rows:
+                order_id = r["order_id"]
+                
+                # Fetch items for this order
+                cursor.execute("SELECT * FROM order_items WHERE order_id = ?", (order_id,))
+                items_rows = cursor.fetchall()
+                items = []
+                for it in items_rows:
+                    items.append({
+                        "product_id": it["product_id"],
+                        "name": it["name"],
+                        "quantity": it["quantity"],
+                        "unit_price": it["unit_price"],
+                        "subtotal": it["subtotal"]
+                    })
+                
+                # Fetch history for this order
+                cursor.execute("SELECT * FROM order_history WHERE order_id = ? ORDER BY id ASC", (order_id,))
+                history_rows = cursor.fetchall()
+                history = []
+                for hist in history_rows:
+                    history.append({
+                        "from": hist["from_state"],
+                        "to": hist["to_state"],
+                        "timestamp": hist["timestamp"]
+                    })
+                
+                # Reconstruct Order object
+                order = Order(
+                    order_id=order_id,
+                    items=items,
+                    subtotal=r["subtotal"],
+                    discount=r["discount"],
+                    shipping=r["shipping"],
+                    tax=r["tax"],
+                    total=r["total"],
+                    username=r["username"],
+                    delivery_otp=r["delivery_otp"]
+                )
+                order.state = OrderState(r["state"])
+                if history:
+                    order.history = history
+                self.orders[order_id] = order
+                
+            conn.close()
+        except Exception as e:
+            logging.error(f"Error loading orders from DB: {e}")
+
+    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest") -> Order:
+        order_id = 'ORD-' + str(random.randint(10000000, 99999999))
+        created_at = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
+        
+        try:
+            from backend.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Insert order main record
+            cursor.execute("""
+            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, delivery_otp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, None))
+            
+            # Insert items
+            for item in items:
+                cursor.execute("""
+                INSERT INTO order_items (order_id, product_id, name, quantity, unit_price, subtotal)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (order_id, item["product_id"], item["name"], item["quantity"], item["unit_price"], item["subtotal"]))
+                
+            # Insert initial state transition history
+            cursor.execute("""
+            INSERT INTO order_history (order_id, from_state, to_state, timestamp)
+            VALUES (?, ?, ?, ?)
+            """, (order_id, None, OrderState.CREATED.value, created_at))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logging.error(f"Error creating order in DB: {e}")
+            
+        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username)
+        self.orders[order_id] = order
+        return order
+
+    def get_order(self, order_id: str) -> Optional[Order]:
+        self.load_from_db()
+        return self.orders.get(order_id)
+
+    def get_all_orders(self) -> list:
+        self.load_from_db()
+        return [order.to_dict() for order in reversed(list(self.orders.values()))]
+
+    def get_user_orders(self, username: str) -> list:
+        self.load_from_db()
+        return [
+            order.to_dict()
+            for order in reversed(list(self.orders.values()))
+            if order.username == username
+        ]
+
+    def transition_order(self, order_id: str, target_state_str: str) -> dict:
+        self.load_from_db()
+        order = self.orders.get(order_id)
+        if not order:
+            return {"success": False, "error": f"Order {order_id} not found", "order": None}
+
+        target_state_upper = target_state_str.upper()
+        
+
+
+        try:
+            target_state = OrderState(target_state_upper)
+        except ValueError:
+            valid = [s.value for s in OrderState]
+            return {"success": False, "error": f"Invalid state '{target_state_str}'. Valid: {valid}", "order": order.to_dict()}
+
+        old_state = order.state
+        if order.transition_to(target_state):
+            # Update state and insert state history record in SQLite database
+            try:
+                from backend.database import get_db_connection
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE orders SET state = ? WHERE order_id = ?", (target_state.value, order_id))
+                
+                timestamp = order.history[-1]["timestamp"]
+                cursor.execute("""
+                INSERT INTO order_history (order_id, from_state, to_state, timestamp)
+                VALUES (?, ?, ?, ?)
+                """, (order_id, old_state.value, target_state.value, timestamp))
+                
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logging.error(f"Error transitioning order in DB: {e}")
+                
+            return {"success": True, "order": order.to_dict()}
+        else:
+            allowed = order.get_allowed_transitions()
+            return {
+                "success": False,
+                "error": f"Cannot transition from {order.state.value} to {target_state.value}. Allowed: {allowed}",
+                "order": order.to_dict()
+            }
