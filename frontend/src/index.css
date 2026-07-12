@@ -22,11 +22,11 @@
 }
 
 .dark {
-  --color-bg: #090D1A;
-  --color-card: #151B2C;
+  --color-bg: #0B0F19;
+  --color-card: #141C2F;
   --color-text: #F8FAFC;
   --color-text-secondary: #94A3B8;
-  --color-border: #1F293D;
+  --color-border: #1E293B;
   --color-primary: #F8FAFC;
   --color-primary-dark: #FFFFFF;
 
@@ -52,6 +52,7 @@
   }
   
   /* Text and borders overrides */
+  .text-slate-950,
   .text-slate-900,
   .text-slate-800,
   .text-slate-700 {
@@ -62,7 +63,33 @@
     color: var(--color-text-secondary) !important;
   }
   .text-slate-400 {
-    color: #64748B !important;
+    color: #94A3B8 !important;
+  }
+  .text-slate-300 {
+    color: #CBD5E1 !important;
+  }
+  
+  .text-indigo-950 {
+    color: #E0E7FF !important;
+  }
+  .text-indigo-900,
+  .text-indigo-850,
+  .text-indigo-800,
+  .text-indigo-700 {
+    color: #C7D2FE !important;
+  }
+  .text-indigo-600 {
+    color: #818CF8 !important;
+  }
+  .text-indigo-500 {
+    color: #818CF8 !important;
+  }
+
+  .bg-slate-200 {
+    background-color: #1E293B !important;
+  }
+  .bg-green-300 {
+    background-color: #059669 !important;
   }
   
   .border-slate-100,
@@ -83,28 +110,31 @@
   .hover\:bg-slate-100:hover {
     background-color: #1E293B !important;
   }
+  .hover\:bg-slate-200:hover {
+    background-color: #1F293D !important;
+  }
   
   /* Glass themes */
   .glass {
-    background: rgba(21, 27, 44, 0.75) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    background: rgba(11, 15, 25, 0.75) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
   
   /* Shadows and depth */
   .shadow-sm {
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4) !important;
   }
   .shadow-md {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3) !important;
   }
   .shadow-lg {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3) !important;
   }
   .shadow-xl {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important;
   }
   .shadow-2xl {
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
   }
 
   /* Form Elements */
@@ -116,6 +146,10 @@
   input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
     background-color: var(--color-card) !important;
     border-color: #6366F1 !important;
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: #475569 !important;
   }
 
   /* Premium Buttons */
@@ -157,9 +191,11 @@
   .btn-premium:not(.bg-white) {
     background-color: #6366F1 !important;
     color: #FFFFFF !important;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3) !important;
   }
   .btn-premium:not(.bg-white):hover {
     background-color: #4F46E5 !important;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
   }
 
   /* Dark-Mode Compatible Badges */
@@ -174,23 +210,41 @@
 
   /* Support for transparent background panels in Dark Mode */
   .bg-white\/80 {
-    background-color: rgba(21, 27, 44, 0.8) !important;
+    background-color: rgba(20, 28, 47, 0.8) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
   }
   .bg-gradient-to-br.from-indigo-50.to-indigo-100\/50 {
     background-image: linear-gradient(to bottom right, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05)) !important;
     border-color: rgba(99, 102, 241, 0.3) !important;
-  }
-  .text-indigo-950 {
-    color: #E0E7FF !important;
-  }
-  .text-indigo-800 {
-    color: #C7D2FE !important;
   }
   .bg-indigo-200\/50 {
     background-color: rgba(99, 102, 241, 0.3) !important;
   }
   .text-indigo-800.font-bold {
     color: #F8FAFC !important;
+  }
+
+  /* Premium product card glow in Dark Mode */
+  .product-card:hover {
+    border-color: rgba(99, 102, 241, 0.35) !important;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), 0 0 15px rgba(99, 102, 241, 0.15) !important;
+  }
+
+  /* Premium Toast styles in Dark Mode */
+  .toast-message {
+    background: rgba(20, 28, 47, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.6) !important;
+  }
+  .toast-title {
+    color: #F8FAFC !important;
+  }
+  .toast-text {
+    color: #94A3B8 !important;
+  }
+  .toast-close:hover {
+    color: #F8FAFC !important;
+    background: #1F293D !important;
   }
 }
 

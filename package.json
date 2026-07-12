@@ -7,10 +7,11 @@
     "test": "tests"
   },
   "scripts": {
-    "backend": "python -X utf8 -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000",
+    "backend": "python scripts/run_backend.py",
     "frontend": "npm run dev --prefix frontend -- --host 0.0.0.0",
+    "predev": "python scripts/cleanup.py",
     "start": "npm run dev",
-    "dev": "concurrently -n BE,FE -c blue,green \"npm run backend\" \"npm run frontend\"",
+    "dev": "concurrently -k -n BE,FE -c blue,green \"npm run backend\" \"npm run frontend\"",
     "test": "python -m pytest -v",
     "coverage": "python -m pytest --cov=backend --cov-report=term-missing"
   },
