@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ShoppingBag, Search, Menu, X, Sparkles, Package, LogIn, LogOut, Shield, User, LayoutDashboard, Sun, Moon, Monitor } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X, Sparkles, Package, LogIn, LogOut, Shield, User, LayoutDashboard, Sun, Moon, Monitor, ClipboardList, Plus } from 'lucide-react';
 
 function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout, theme, setTheme }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -89,6 +89,22 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
                       </span>
                     )}
                   </div>
+                </NavLink>
+              </>
+            )}
+            {isAdmin && (
+              <>
+                <NavLink to="/admin" className={navClass}>
+                  <LayoutDashboard size={16} /> Dashboard
+                </NavLink>
+                <NavLink to="/orders" className={navClass}>
+                  <Package size={16} /> Status Track
+                </NavLink>
+                <NavLink to="/inventory-logs" className={navClass}>
+                  <ClipboardList size={16} /> Inventory
+                </NavLink>
+                <NavLink to="/add-product" className={navClass}>
+                  <Plus size={16} /> Add Product
                 </NavLink>
               </>
             )}
@@ -240,9 +256,14 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
               </>
             )}
             {isAdmin && (
-              <NavLink to="/admin" className="text-lg font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2">
-                <LayoutDashboard size={20} /> Admin Dashboard
-              </NavLink>
+              <>
+                <NavLink to="/admin" className="text-lg font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2">
+                  <LayoutDashboard size={20} /> Dashboard
+                </NavLink>
+                <NavLink to="/orders" className="text-lg font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2">
+                  <Package size={20} /> Status Track
+                </NavLink>
+              </>
             )}
           </nav>
         </div>

@@ -288,6 +288,10 @@ h1, h2, h3, h4, h5, h6 {
   animation: scaleUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.animate-slideUp {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Premium Product Card Hover */
 .product-card {
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);

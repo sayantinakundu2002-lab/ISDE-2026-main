@@ -2,13 +2,11 @@
 """Checkout, order placement, and order management endpoints."""
 
 from typing import Optional
-from datetime import datetime
 
 from fastapi import APIRouter, Form, HTTPException, Depends
 
 from backend.managers import inventory_manager, cart_manager, order_manager
 from backend.config import get_checkout_context
-from backend.patterns.state import OrderState
 from backend.auth import require_user, require_admin, get_current_user
 
 router = APIRouter()
@@ -30,19 +28,21 @@ def checkout_summary(
         if prod:
             subtotal += prod["price"] * qty
             item_count += qty
-
+            
     context = get_checkout_context(promo_code, subtotal)
     bill = context.calculate_bill(subtotal, item_count)
     return bill
-
 
 @router.post("/checkout/place-order")
 def place_order(
     cart_id: str = Form(...),
     promo_code: Optional[str] = Form(None),
+    shipping_address: str = Form("Not provided"),
     user: dict = Depends(require_user)
 ):
     """Place an order from the cart. The order starts in CREATED state."""
+    cleaned_shipping_address = shipping_address.strip() if shipping_address and shipping_address.strip() else "Not provided"
+
     # Use user's username as cart_id for user-scoped carts
     actual_cart_id = user["username"]
     cart = cart_manager.get_cart(actual_cart_id)
@@ -85,11 +85,15 @@ def place_order(
         shipping=bill["shipping"],
         tax=bill["tax"],
         total=bill["total"],
-        username=user["username"]
+        username=user["username"],
+        shipping_address=cleaned_shipping_address
     )
 
     # Auto-transition to PAID since payment is completed at checkout
-    order_manager.transition_order(order.order_id, "PAID")
+    payment_result = order_manager.transition_order(order.order_id, "PAID")
+    if not payment_result["success"]:
+        raise HTTPException(status_code=500, detail=payment_result["error"])
+    paid_order = payment_result["order"]
 
     # Reduce stock (triggers observer alerts — Issue #4)
     for pid, qty in list(cart.items()):
@@ -100,23 +104,19 @@ def place_order(
 
     return {
         "message": "Order placed successfully",
-        "order_id": order.order_id,
-        "state": order.state.value,
-        "items": order.items,
-        "breakdown": {
-            "subtotal": order.subtotal,
-            "discount": order.discount,
-            "shipping": order.shipping,
-            "total": order.total,
-        },
-        "subtotal": order.subtotal,
-        "discount": order.discount,
-        "shipping": order.shipping,
-        "tax": order.tax,
-        "total": order.total,
-        "date": order.created_at,
-        "transactionId": order.order_id,
-        "allowed_transitions": order.get_allowed_transitions(),
+        "order_id": paid_order["order_id"],
+        "state": paid_order["state"],
+        "items": paid_order["items"],
+        "breakdown": paid_order["breakdown"],
+        "subtotal": paid_order["subtotal"],
+        "discount": paid_order["discount"],
+        "shipping": paid_order["shipping"],
+        "tax": paid_order["tax"],
+        "total": paid_order["total"],
+        "date": paid_order["created_at"],
+        "transactionId": paid_order["order_id"],
+        "shipping_address": paid_order["shipping_address"],
+        "allowed_transitions": paid_order["allowed_transitions"],
     }
 
 
@@ -137,7 +137,7 @@ def list_my_orders(user: dict = Depends(require_user)):
 
 
 @router.get("/orders/{order_id}")
-def get_order(order_id: str, user: Optional[dict] = Depends(get_current_user)):
+def get_order(order_id: str, user: dict = Depends(require_user)):
     """Get a single order with full details and breakdown."""
     order = order_manager.get_order(order_id)
     if not order:
@@ -149,13 +149,24 @@ def get_order(order_id: str, user: Optional[dict] = Depends(get_current_user)):
 
 
 @router.post("/orders/{order_id}/transition")
-def transition_order(order_id: str, target_state: str = Form(...), user: dict = Depends(require_admin)):
-    """Transition an order to a new state. Admin only.
-
-    Enforces the state machine rules:
-      CREATED → PAID → PACKED → SHIPPED → DELIVERED
-      CANCELLED is allowed from CREATED, PAID, or PACKED.
+def transition_order(order_id: str, target_state: str = Form(...), user: dict = Depends(require_user)):
+    """Transition an order to a new state.
+    Users can cancel their own orders. Admins cannot cancel orders.
+    Admins can do other transitions.
     """
+    order = order_manager.get_order(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if target_state == "CANCELLED":
+        if user["role"] == "admin":
+            raise HTTPException(status_code=403, detail="Admins cannot cancel orders")
+        if order.username != user["username"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        if user["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can perform this transition")
+
     result = order_manager.transition_order(order_id, target_state)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])

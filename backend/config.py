@@ -23,7 +23,7 @@ class StrategyConfig:
     # Options: "flat_rate", "free_over", "weight_based", "free"
 
     SHIPPING_FLAT_RATE = float(os.environ.get("SHIPPING_FLAT_RATE", "10"))
-    SHIPPING_FREE_THRESHOLD = float(os.environ.get("SHIPPING_FREE_THRESHOLD", "100"))
+    SHIPPING_FREE_THRESHOLD = float(os.environ.get("SHIPPING_FREE_THRESHOLD", "50"))
     SHIPPING_WEIGHT_RATE = float(os.environ.get("SHIPPING_WEIGHT_RATE", "0.5"))
     SHIPPING_WEIGHT_PER_ITEM = float(os.environ.get("SHIPPING_WEIGHT_PER_ITEM", "1.0"))
 

@@ -116,7 +116,7 @@ class CheckoutContext:
     def calculate_bill(self, subtotal: float, item_count: int = 1) -> dict:
         discount = self.discount_strategy.calculate_discount(subtotal)
         remaining = max(0.0, subtotal - discount)
-        shipping = self.shipping_strategy.calculate_shipping(remaining, item_count)
+        shipping = self.shipping_strategy.calculate_shipping(subtotal, item_count)
         tax = round(remaining * self.tax_rate, 2)
         total = round(remaining + shipping + tax, 2)
         return {

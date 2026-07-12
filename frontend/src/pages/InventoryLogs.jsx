@@ -84,7 +84,8 @@ function InventoryLogs() {
             {reorders.map((msg, idx) => (
               <div
                 key={idx}
-                className="px-5 py-3.5 border-b border-slate-100 last:border-b-0 flex items-start gap-3 hover:bg-amber-50/30 transition-colors"
+                className="animate-slideUp px-5 py-3.5 border-b border-slate-100 last:border-b-0 flex items-start gap-3 hover:bg-amber-50/30 transition-colors"
+                style={{ animationDelay: `${idx * 50}ms` }}
               >
                 <div className="w-2 h-2 bg-amber-400 rounded-full mt-2 shrink-0 animate-pulse" />
                 <span className="text-sm text-slate-700 font-mono leading-relaxed">{msg}</span>
@@ -110,7 +111,8 @@ function InventoryLogs() {
             {logs.map((msg, idx) => (
               <div
                 key={idx}
-                className="px-5 py-3.5 border-b border-slate-100 last:border-b-0 flex items-start gap-3 hover:bg-indigo-50/30 transition-colors"
+                className="animate-slideUp px-5 py-3.5 border-b border-slate-100 last:border-b-0 flex items-start gap-3 hover:bg-indigo-50/30 transition-colors"
+                style={{ animationDelay: `${idx * 50}ms` }}
               >
                 <div className="w-2 h-2 bg-indigo-400 rounded-full mt-2 shrink-0" />
                 <span className="text-sm text-slate-700 font-mono leading-relaxed">{msg}</span>

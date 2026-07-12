@@ -44,6 +44,17 @@ export default function TerminalLog() {
     return 'text-amber-400';
   };
 
+  const getLastResponseStatus = () => {
+    for (let i = logs.length - 1; i >= 0; i--) {
+      if (logs[i].direction === 'INCOMING') {
+        return logs[i].status;
+      }
+    }
+    return null;
+  };
+
+  const isDisconnected = getLastResponseStatus() === 'NET_ERR';
+
   return (
     <div className={`terminal-container ${isExpanded ? 'expanded' : 'collapsed'}`}>
       <div className="terminal-header" onClick={() => setIsExpanded(!isExpanded)}>
@@ -51,7 +62,7 @@ export default function TerminalLog() {
           <Terminal size={16} className="text-cyan-400 animate-pulse" />
           <span>http-client-terminal@isde-minishop:~</span>
           <span className="terminal-status-indicator">
-            {logs.some(l => l.status === 'NET_ERR') ? (
+            {isDisconnected ? (
               <span className="status-badge error"><WifiOff size={12} /> Disconnected</span>
             ) : (
               <span className="status-badge active"><Wifi size={12} /> Connected</span>

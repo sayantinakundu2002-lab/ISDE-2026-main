@@ -11,7 +11,7 @@ DEFAULT_USERS = (
     {
         "username": "TestUser",
         "email": "testuser@gmail.com",
-        "password": "TesUser",
+        "password": "TestUser",
         "role": "user",
         "full_name": "TestUser",
     },
@@ -98,9 +98,11 @@ def _create_schema(cursor):
         tax REAL,
         total REAL,
         created_at TEXT,
+        shipping_address TEXT,
         delivery_otp TEXT
     )
     """)
+    _ensure_column(cursor, "orders", "shipping_address", "TEXT")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS order_items (
@@ -141,6 +143,14 @@ def _create_schema(cursor):
         value TEXT
     )
     """)
+
+
+def _ensure_column(cursor, table_name: str, column_name: str, column_type: str):
+    """Add a missing column to an existing SQLite table."""
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    existing_columns = {row["name"] for row in cursor.fetchall()}
+    if column_name not in existing_columns:
+        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
 
 def _reset_runtime_data(cursor):

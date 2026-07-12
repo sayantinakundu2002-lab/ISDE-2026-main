@@ -91,14 +91,15 @@ function Home({ products, categories, activeCategory, onCategoryChange, onAddToC
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {displayed.map(p => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onAddToCart={onAddToCart}
-                    loading={loading}
-                    showAddToCart={showAddToCart}
-                  />
+                {displayed.map((p, idx) => (
+                  <div key={p.id} className="animate-slideUp" style={{ animationDelay: `${idx * 75}ms` }}>
+                    <ProductCard
+                      product={p}
+                      onAddToCart={onAddToCart}
+                      loading={loading}
+                      showAddToCart={showAddToCart}
+                    />
+                  </div>
                 ))}
               </div>
             )}

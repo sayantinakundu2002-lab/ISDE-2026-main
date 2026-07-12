@@ -31,7 +31,7 @@ _ALLOWED_TRANSITIONS = {
 class Order:
     """Represents a placed order with a finite-state transition model."""
 
-    def __init__(self, order_id: str, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", delivery_otp: str = None):
+    def __init__(self, order_id: str, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", delivery_otp: str = None, created_at: str = None, shipping_address: str = ""):
         self.order_id = order_id
         self.items = items
         self.subtotal = subtotal
@@ -41,9 +41,10 @@ class Order:
         self.total = total
         self.username = username
         self.state = OrderState.CREATED
-        self.created_at = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
-        self.history = [{"from": None, "to": OrderState.CREATED, "timestamp": self.created_at}]
+        self.created_at = created_at or datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
+        self.history = [{"from": None, "to": OrderState.CREATED.value, "timestamp": self.created_at}]
         self.delivery_otp = delivery_otp
+        self.shipping_address = shipping_address
 
     def transition_to(self, target_state: OrderState) -> bool:
         """Attempt a state transition. Returns True if allowed, False otherwise."""
@@ -76,6 +77,7 @@ class Order:
             "tax": self.tax,
             "total": self.total,
             "created_at": self.created_at,
+            "shipping_address": self.shipping_address,
             "allowed_transitions": self.get_allowed_transitions(),
             "history": self.history,
             "delivery_otp": self.delivery_otp,

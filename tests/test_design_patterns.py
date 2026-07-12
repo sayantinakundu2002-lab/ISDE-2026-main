@@ -78,13 +78,13 @@ def test_strategy_calculations():
 
     # 3. Context Calculation
     context = CheckoutContext(pct_discount, threshold_shipping, tax_rate=0.10)
-    # Subtotal 100. Discount 10% -> remaining = 90. Shipping for remaining 90 -> 12.50. Tax for remaining 90 -> 9.00. Total = 90 + 12.50 + 9 = 111.50
+    # Subtotal 100. Discount 10% -> remaining = 90. Shipping uses the pre-discount subtotal, so it is free at the 100 threshold.
     bill = context.calculate_bill(100.0)
     assert bill["subtotal"] == 100.0
     assert bill["discount"] == 10.0
-    assert bill["shipping"] == 12.50
+    assert bill["shipping"] == 0.0
     assert bill["tax"] == 9.00
-    assert bill["total"] == 111.50
+    assert bill["total"] == 99.0
 
 
 def test_order_state_machine():

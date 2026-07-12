@@ -1,6 +1,6 @@
 # ISDE 2026 MiniShop
 
-ISDE 2026 MiniShop is a full-stack e-commerce learning project built with a FastAPI backend, SQLite storage, and a React + Vite frontend. It demonstrates practical API design, authentication, product management, cart operations, checkout, order state transitions, inventory observers, and several software design patterns in one small application.
+ISDE 2026 MiniShop is a full-stack e-commerce learning project built with a FastAPI backend, SQLite storage, and a React + Vite frontend. It demonstrates practical API design, authentication, product management, cart operations, checkout with shipping addresses, order state transitions, inventory observers, and several software design patterns in one small application.
 
 The project is designed to run locally or inside GitHub Codespaces. A shared SQLite database file is included so every clone starts from the same cleaned baseline.
 
@@ -223,22 +223,23 @@ Password: TesUser
 
 8. Add the product to the cart.
 9. Open the cart and proceed to checkout.
-10. Optionally test promo codes:
+10. Enter a shipping address. Orders under `$50` include a `$10` shipping charge; orders at `$50` or more ship free by default.
+11. Optionally test promo codes:
 
 ```text
 SAVE10
 BULK20
 ```
 
-11. Place the order.
-12. Log back in as `TestAdmin`.
-13. Open the Admin Dashboard and transition the order through:
+12. Place the order.
+13. Log back in as `TestAdmin`.
+14. Open the Admin Dashboard and transition the order through:
 
 ```text
 PAID -> PACKED -> SHIPPED -> DELIVERED
 ```
 
-14. Open Inventory Logs to inspect stock deductions and low-stock alerts.
+15. Open Inventory Logs to inspect stock deductions and low-stock alerts.
 
 ## Automated Tests
 
@@ -246,6 +247,12 @@ Run the full test suite from the repository root:
 
 ```bash
 python -m pytest -v
+```
+
+Run the test suite with backend coverage:
+
+```bash
+npm run coverage
 ```
 
 The tests cover:
@@ -256,11 +263,13 @@ The tests cover:
 - Admin product creation.
 - Cart add, view, and remove operations.
 - Registration flow.
-- Checkout and order delivery transitions.
+- Checkout shipping thresholds, required shipping addresses, and order delivery transitions.
 - Singleton manager behavior.
 - Strategy pattern calculations.
 - State pattern order lifecycle rules.
 - Observer pattern stock decrement and low-stock alert behavior.
+
+GitHub Actions CI is configured in `.github/workflows/ci.yml`. It runs backend tests with coverage and builds the frontend on pushes and pull requests.
 
 The tests use `backend/minishop_test.db` and reset it to the same default baseline before API tests.
 
@@ -318,6 +327,12 @@ Run tests:
 
 ```bash
 python -m pytest -v
+```
+
+Run coverage:
+
+```bash
+npm run coverage
 ```
 
 Reset database baseline:
@@ -388,7 +403,7 @@ Key backend routes:
 | `DELETE` | `/products/{product_id}` | Delete a product. Admin only. |
 | `POST` | `/cart/add` | Add an item to a cart. |
 | `GET` | `/cart` | View a cart. |
-| `POST` | `/checkout/place-order` | Place an order from the current cart. |
+| `POST` | `/checkout/place-order` | Place an order from the current cart with a required shipping address. |
 | `GET` | `/orders` | List orders. Admin sees all; users see their own. |
 | `POST` | `/orders/{order_id}/transition` | Move an order to the next state. Admin only. |
 | `GET` | `/admin/inventory/logs` | View stock logs and alerts. Admin only. |

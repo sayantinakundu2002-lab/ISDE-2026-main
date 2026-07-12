@@ -11,7 +11,8 @@
     "frontend": "npm run dev --prefix frontend -- --host 0.0.0.0",
     "start": "npm run dev",
     "dev": "concurrently -n BE,FE -c blue,green \"npm run backend\" \"npm run frontend\"",
-    "test": "python -m pytest -v"
+    "test": "python -m pytest -v",
+    "coverage": "python -m pytest --cov=backend --cov-report=term-missing"
   },
   "repository": {
     "type": "git",

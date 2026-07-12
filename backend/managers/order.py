@@ -61,7 +61,9 @@ class OrderManager(metaclass=SingletonMeta):
                     tax=r["tax"],
                     total=r["total"],
                     username=r["username"],
-                    delivery_otp=r["delivery_otp"]
+                    delivery_otp=r["delivery_otp"],
+                    created_at=r["created_at"],
+                    shipping_address=r["shipping_address"] or ""
                 )
                 order.state = OrderState(r["state"])
                 if history:
@@ -72,7 +74,8 @@ class OrderManager(metaclass=SingletonMeta):
         except Exception as e:
             logging.error(f"Error loading orders from DB: {e}")
 
-    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest") -> Order:
+    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", shipping_address: str = "") -> Order:
+        """Create and persist an order with its shipping destination."""
         order_id = 'ORD-' + str(random.randint(10000000, 99999999))
         created_at = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
         
@@ -83,9 +86,9 @@ class OrderManager(metaclass=SingletonMeta):
             
             # Insert order main record
             cursor.execute("""
-            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, delivery_otp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, None))
+            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, shipping_address, delivery_otp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, shipping_address, None))
             
             # Insert items
             for item in items:
@@ -105,7 +108,7 @@ class OrderManager(metaclass=SingletonMeta):
         except Exception as e:
             logging.error(f"Error creating order in DB: {e}")
             
-        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username)
+        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username, created_at=created_at, shipping_address=shipping_address)
         self.orders[order_id] = order
         return order
 
@@ -131,7 +134,7 @@ class OrderManager(metaclass=SingletonMeta):
         if not order:
             return {"success": False, "error": f"Order {order_id} not found", "order": None}
 
-        target_state_upper = target_state_str.upper()
+        target_state_upper = target_state_str.strip().upper()
         
 
 

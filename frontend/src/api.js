@@ -113,6 +113,15 @@ async function apiRequest(path, options = {}) {
         error: errorMsg,
         data: null
       });
+
+      // Auto-signout and redirect on unauthorized 401 response
+      if (response.status === 401) {
+        clearToken();
+        if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+          window.location.href = '/login';
+        }
+      }
+
       throw new Error(errorMsg);
     }
 

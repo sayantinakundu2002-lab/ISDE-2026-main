@@ -13,7 +13,7 @@ function CategorySidebar({ categories, activeCategory, onCategoryChange }) {
       <div className="sticky top-28">
         <h3 className="font-heading font-bold text-slate-900 text-lg mb-4 pl-2">Collections</h3>
         <ul className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 scrollbar-hide">
-          <li>
+          <li className="animate-slideUp" style={{ animationDelay: '0ms' }}>
             <button
               onClick={() => onCategoryChange(null)}
               className={`w-full whitespace-nowrap text-left px-5 py-3 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-3 ${
@@ -26,11 +26,11 @@ function CategorySidebar({ categories, activeCategory, onCategoryChange }) {
               All Arrivals
             </button>
           </li>
-          {Object.entries(categories).map(([key, cat]) => {
+          {Object.entries(categories).map(([key, cat], idx) => {
             const CategoryIcon = CATEGORY_ICONS[key] || Sparkles;
 
             return (
-              <li key={key}>
+              <li key={key} className="animate-slideUp" style={{ animationDelay: `${(idx + 1) * 75}ms` }}>
                 <button
                   onClick={() => onCategoryChange(key)}
                   className={`w-full whitespace-nowrap text-left px-5 py-3 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-3 ${

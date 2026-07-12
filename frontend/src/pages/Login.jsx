@@ -233,11 +233,11 @@ function Login({ onLogin, showToast }) {
               <div className="mt-6 flex flex-col gap-2 text-xs text-slate-400">
                 <div className="flex items-center gap-2 justify-center">
                   <Shield size={14} className="text-indigo-400" />
-                  <span>User: <span className="font-mono font-semibold text-slate-500">TestUser</span> / <span className="font-mono font-semibold text-slate-500">TesUser</span></span>
+                  <span>User: <span className="font-mono font-semibold text-slate-500">TestUser</span> / Password: <span className="font-mono font-semibold text-slate-500">TestUser</span></span>
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   <Shield size={14} className="text-purple-400" />
-                  <span>Admin: <span className="font-mono font-semibold text-slate-500">TestAdmin</span> / <span className="font-mono font-semibold text-slate-500">TestAdmin</span></span>
+                  <span>Admin: <span className="font-mono font-semibold text-slate-500">TestAdmin</span> / Password: <span className="font-mono font-semibold text-slate-500">TestAdmin</span></span>
                 </div>
               </div>
             )}

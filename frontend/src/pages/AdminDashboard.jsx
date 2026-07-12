@@ -76,12 +76,10 @@ function AdminDashboard({ showToast, refreshProducts }) {
   const handleTransition = async (orderId, targetState) => {
     setTransitioning(orderId);
     try {
-      const res = await api.transitionOrder(orderId, targetState);
+      await api.transitionOrder(orderId, targetState);
       showToast('Order Updated', `${orderId} → ${targetState}`, 'success');
-      // Update order in state
-      setOrders(prev => prev.map(o =>
-        o.order_id === orderId ? res.order : o
-      ));
+      // Reload all orders from the API to guarantee data consistency
+      await loadOrders();
     } catch (err) {
       showToast('Error', err.message || 'Transition failed', 'error');
     } finally {
@@ -247,14 +245,14 @@ function AdminDashboard({ showToast, refreshProducts }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => {
+                  {products.map((product, idx) => {
                     const discountPct = product.discount_percent || 0;
                     const finalPrice = discountPct > 0
                       ? product.price * (1 - discountPct / 100)
                       : product.price;
 
                     return (
-                      <tr key={product.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                      <tr key={product.id} className="animate-slideUp border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors" style={{ animationDelay: `${idx * 50}ms` }}>
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3 min-w-[200px]">
                             <img
@@ -342,7 +340,7 @@ function AdminDashboard({ showToast, refreshProducts }) {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {orders.map((order) => {
+          {orders.map((order, idx) => {
             const stateConfig = STATE_CONFIG[order.state] || STATE_CONFIG.CREATED;
             const StateIcon = stateConfig.icon;
             const currentStepIdx = LIFECYCLE_STEPS.indexOf(order.state);
@@ -352,7 +350,8 @@ function AdminDashboard({ showToast, refreshProducts }) {
             return (
               <div
                 key={order.order_id}
-                className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition-all hover:shadow-md ${stateConfig.border}`}
+                className={`animate-slideUp bg-white border rounded-2xl shadow-sm overflow-hidden transition-all hover:shadow-md ${stateConfig.border}`}
+                style={{ animationDelay: `${idx * 50}ms` }}
               >
                 {/* Order Header */}
                 <div className="p-5 flex items-center justify-between gap-4">
@@ -447,16 +446,7 @@ function AdminDashboard({ showToast, refreshProducts }) {
                           </button>
                         );
                       })}
-                    {order.allowed_transitions.includes('CANCELLED') && (
-                      <button
-                        onClick={() => handleTransition(order.order_id, 'CANCELLED')}
-                        disabled={transitioning === order.order_id}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 text-red-600 text-xs font-semibold rounded-full border border-red-200 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
-                      >
-                        <XCircle size={14} />
-                        Cancel
-                      </button>
-                    )}
+
                   </div>
                 )}
               </div>

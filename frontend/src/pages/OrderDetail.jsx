@@ -159,39 +159,52 @@ function OrderDetail() {
       )}
 
       {/* Transition Actions */}
-      {isAdmin && order.allowed_transitions && order.allowed_transitions.length > 0 && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 mb-6 shadow-sm">
-          <h2 className="font-heading text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Actions</h2>
-          <div className="flex flex-wrap gap-3">
-            {order.allowed_transitions
-              .filter(t => t !== 'CANCELLED')
-              .map((targetState) => {
-                const config = TRANSITION_LABELS[targetState] || { label: targetState, icon: ChevronRight, color: 'bg-slate-600' };
-                const BtnIcon = config.icon;
-                return (
-                  <button
-                    key={targetState}
-                    onClick={() => handleTransition(targetState)}
-                    disabled={transitioning}
-                    className={`inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-full ${config.color} active:scale-95 transition-all shadow-md disabled:opacity-50`}
-                  >
-                    <BtnIcon size={16} />
-                    {config.label}
-                  </button>
-                );
-              })}
-            {order.allowed_transitions.includes('CANCELLED') && (
+      {order.allowed_transitions && order.allowed_transitions.length > 0 && (
+        <>
+          {/* Admin Actions (No Cancel) */}
+          {isAdmin && order.allowed_transitions.filter(t => t !== 'CANCELLED').length > 0 && (
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 mb-6 shadow-sm">
+              <h2 className="font-heading text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Actions</h2>
+              <div className="flex flex-wrap gap-3">
+                {order.allowed_transitions
+                  .filter(t => t !== 'CANCELLED')
+                  .map((targetState) => {
+                    const config = TRANSITION_LABELS[targetState] || { label: targetState, icon: ChevronRight, color: 'bg-slate-600' };
+                    const BtnIcon = config.icon;
+                    return (
+                      <button
+                        key={targetState}
+                        onClick={() => handleTransition(targetState)}
+                        disabled={transitioning}
+                        className={`inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-full ${config.color} active:scale-95 transition-all shadow-md disabled:opacity-50`}
+                      >
+                        <BtnIcon size={16} />
+                        {config.label}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* User Cancel Action (Only User) */}
+          {!isAdmin && order.allowed_transitions.includes('CANCELLED') && (
+            <div className="bg-white border border-red-100 rounded-2xl p-6 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-heading text-sm font-bold text-red-600 uppercase tracking-wider mb-1">Cancel Order</h2>
+                <p className="text-xs text-slate-500">You can still cancel this order before it ships.</p>
+              </div>
               <button
                 onClick={() => handleTransition('CANCELLED')}
                 disabled={transitioning}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-red-600 text-sm font-semibold rounded-full border-2 border-red-200 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-red-600 text-sm font-semibold rounded-full border-2 border-red-200 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50 shrink-0"
               >
                 <XCircle size={16} />
                 Cancel Order
               </button>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

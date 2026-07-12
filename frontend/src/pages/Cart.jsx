@@ -1,7 +1,42 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { ShoppingBag, Trash2, ArrowRight, ShieldCheck, Minus, Plus } from 'lucide-react';
+import { api } from '../api';
 
 function Cart({ cart, onRemoveFromCart, onUpdateCartQty, onCheckout, loading }) {
+  const fallbackSummary = {
+    subtotal: cart.total || 0,
+    discount: 0,
+    shipping: cart.total > 0 && cart.total < 50 ? 10 : 0,
+    tax: Number(((cart.total || 0) * 0.08).toFixed(2)),
+    total: Number(((cart.total || 0) + (cart.total > 0 && cart.total < 50 ? 10 : 0) + ((cart.total || 0) * 0.08)).toFixed(2)),
+  };
+  const [summary, setSummary] = useState(fallbackSummary);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (cart.items.length === 0) {
+      setSummary(fallbackSummary);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    api.getCheckoutSummary(cart.cart_id || 'default')
+      .then((data) => {
+        if (!cancelled) setSummary(data);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(fallbackSummary);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.cart_id, cart.total, cart.items.length]);
+
   return (
     <div className="pt-28 pb-20 max-w-6xl mx-auto px-6">
       <div className="flex items-end justify-between mb-10">
@@ -38,7 +73,8 @@ function Cart({ cart, onRemoveFromCart, onUpdateCartQty, onCheckout, loading }) 
               {cart.items.map((item, idx) => (
                 <div
                   key={item.product_id}
-                  className={`flex flex-col sm:flex-row items-center sm:items-start gap-6 p-6 sm:p-8 group transition-colors hover:bg-slate-50/50 ${idx < cart.items.length - 1 ? 'border-b border-slate-100' : ''}`}
+                  className={`animate-slideUp flex flex-col sm:flex-row items-center sm:items-start gap-6 p-6 sm:p-8 group transition-colors hover:bg-slate-50/50 ${idx < cart.items.length - 1 ? 'border-b border-slate-100' : ''}`}
+                  style={{ animationDelay: `${idx * 75}ms` }}
                 >
                   <Link to={`/product/${item.product_id}`} className="w-full sm:w-32 aspect-square rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden relative">
                     <img
@@ -100,21 +136,34 @@ function Cart({ cart, onRemoveFromCart, onUpdateCartQty, onCheckout, loading }) 
               <div className="space-y-4 text-sm font-medium text-slate-300 mb-8">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="text-white">${cart.total.toFixed(2)}</span>
+                  <span className="text-white">${summary.subtotal.toFixed(2)}</span>
                 </div>
+                {summary.discount > 0 && (
+                  <div className="flex justify-between text-emerald-400">
+                    <span>Discount</span>
+                    <span>-${summary.discount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span className="text-emerald-400">Complimentary</span>
+                  {summary.shipping === 0 ? (
+                    <span className="text-emerald-400">Complimentary</span>
+                  ) : (
+                    <span className="text-white">${summary.shipping.toFixed(2)}</span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-500">
+                  Orders under $50 include a $10 shipping charge.
                 </div>
                 <div className="flex justify-between">
                   <span>Taxes</span>
-                  <span className="text-white">$0.00</span>
+                  <span className="text-white">${summary.tax.toFixed(2)}</span>
                 </div>
               </div>
               
               <div className="flex justify-between items-end pt-6 border-t border-slate-700 mb-8">
                 <span className="text-slate-300 font-medium">Total</span>
-                <span className="text-3xl font-bold tracking-tight">${cart.total.toFixed(2)}</span>
+                <span className="text-3xl font-bold tracking-tight">${summary.total.toFixed(2)}</span>
               </div>
               
               <button

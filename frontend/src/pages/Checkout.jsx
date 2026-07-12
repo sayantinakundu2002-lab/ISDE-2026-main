@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sparkles, Copy, ArrowRight, Check, Tag, ShieldCheck, CreditCard, ShoppingBag, X } from 'lucide-react';
+import { Sparkles, Copy, ArrowRight, Check, Tag, ShieldCheck, CreditCard, ShoppingBag, X, MapPin } from 'lucide-react';
 import { api } from '../api';
 
 function Checkout({ cart, loadCart, showToast }) {
@@ -64,7 +64,7 @@ function Checkout({ cart, loadCart, showToast }) {
   const handlePlaceOrder = async () => {
     setPlacingOrder(true);
     try {
-      const orderReceipt = await api.placeOrder(cart.cart_id || 'default', appliedPromo);
+      const orderReceipt = await api.placeOrder(cart.cart_id || 'default', appliedPromo, "Not required");
       setReceipt(orderReceipt);
       showToast('Success', 'Your order was placed successfully!', 'success');
       await loadCart(); // Refresh cart to empty it on the app level
@@ -109,9 +109,9 @@ function Checkout({ cart, loadCart, showToast }) {
         
         {/* Left column: Checkout Bill details */}
         <div className="lg:col-span-7">
-          <h1 className="font-heading text-3xl font-extrabold text-slate-900 tracking-tight mb-8">Checkout Checkout</h1>
+          <h1 className="font-heading text-3xl font-extrabold text-slate-900 tracking-tight mb-8">Checkout</h1>
           
-          <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm mb-8">
+          <div className="animate-slideUp bg-white rounded-3xl border border-slate-100 p-8 shadow-sm mb-8" style={{ animationDelay: '0ms' }}>
             <h2 className="font-heading text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
               <ShoppingBag size={20} className="text-slate-600" /> Review Items
             </h2>
@@ -131,7 +131,7 @@ function Checkout({ cart, loadCart, showToast }) {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <div className="animate-slideUp bg-white rounded-3xl border border-slate-100 p-8 shadow-sm" style={{ animationDelay: '75ms' }}>
             <h2 className="font-heading text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
               <CreditCard size={20} className="text-slate-600" /> Payment & Promo
             </h2>
@@ -173,11 +173,12 @@ function Checkout({ cart, loadCart, showToast }) {
                 Tip: Use <span className="font-bold text-slate-600">SAVE10</span> for 10% off. High subtotal (&gt;$150) gets automatically discounted if no coupon is set.
               </p>
             </form>
+
           </div>
         </div>
 
         {/* Right column: Sticky Checkout Bill Summary card */}
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-5 animate-slideUp" style={{ animationDelay: '150ms' }}>
           <div className="bg-slate-900 text-white rounded-3xl p-8 sticky top-28 shadow-2xl shadow-indigo-900/10">
             <h3 className="font-heading text-xl font-bold mb-8">Checkout Summary</h3>
             
@@ -199,6 +200,9 @@ function Checkout({ cart, loadCart, showToast }) {
                 ) : (
                   <span className="text-white">${summary.shipping.toFixed(2)}</span>
                 )}
+              </div>
+              <div className="text-xs text-slate-500">
+                Orders under $50 include a $10 shipping charge.
               </div>
               <div className="flex justify-between">
                 <span>Taxes (8%)</span>
@@ -290,6 +294,7 @@ function Checkout({ cart, loadCart, showToast }) {
                   <span className="text-slate-500 font-medium">Grand Total Paid</span>
                   <span className="text-xl font-bold text-emerald-600">${receipt.total.toFixed(2)}</span>
                 </div>
+
               </div>
 
               <div className="flex gap-4">
