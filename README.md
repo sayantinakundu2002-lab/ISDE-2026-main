@@ -96,8 +96,8 @@ GitHub Codespaces already includes the main system tools. You still need to inst
 Clone the project and enter the repository:
 
 ```bash
-git clone https://github.com/sayantinakundu2002-lab/ISDE-2026-main.git
-cd ISDE-2026-main
+git clone https://github.com/sayantinakundu2002-lab/ISDE-2026.git
+cd ISDE-2026
 ```
 
 Create and activate a Python virtual environment:
@@ -105,7 +105,6 @@ Create and activate a Python virtual environment:
 ```bash
 # Windows PowerShell
 python -m venv venv
-Set-ExecutionPolicy Bypass -Scope Process
 .\venv\Scripts\Activate.ps1
 
 # macOS or Linux
