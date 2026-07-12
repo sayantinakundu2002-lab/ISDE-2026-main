@@ -18,6 +18,7 @@ function Checkout({ cart, loadCart, showToast }) {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState('');
 
   // Load checkout summary when promo code or cart items change
   const fetchSummary = async (code = '') => {
@@ -62,9 +63,13 @@ function Checkout({ cart, loadCart, showToast }) {
   };
 
   const handlePlaceOrder = async () => {
+    if (!shippingAddress.trim()) {
+      showToast('Error', 'Shipping address is required to place your order.', 'error');
+      return;
+    }
     setPlacingOrder(true);
     try {
-      const orderReceipt = await api.placeOrder(cart.cart_id || 'default', appliedPromo, "Not required");
+      const orderReceipt = await api.placeOrder(cart.cart_id || 'default', appliedPromo, shippingAddress.trim());
       setReceipt(orderReceipt);
       showToast('Success', 'Your order was placed successfully!', 'success');
       await loadCart(); // Refresh cart to empty it on the app level
@@ -128,6 +133,23 @@ function Checkout({ cart, loadCart, showToast }) {
                   <div className="font-bold text-slate-900 text-sm">${item.subtotal.toFixed(2)}</div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Shipping Address section */}
+          <div className="animate-slideUp bg-white rounded-3xl border border-slate-100 p-8 shadow-sm mb-8" style={{ animationDelay: '50ms' }}>
+            <h2 className="font-heading text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <MapPin size={20} className="text-slate-600" /> Shipping Address
+            </h2>
+            <div className="space-y-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Delivery Address</label>
+              <textarea
+                value={shippingAddress}
+                onChange={(e) => setShippingAddress(e.target.value)}
+                placeholder="Enter your full shipping address..."
+                rows={3}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm font-semibold text-slate-950 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 resize-none"
+              />
             </div>
           </div>
 

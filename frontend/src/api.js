@@ -283,10 +283,11 @@ export const api = {
     return apiRequest(`/cart/checkout-summary${qs ? '?' + qs : ''}`);
   },
 
-  placeOrder: (cartId = 'default', promoCode = '') => {
+  placeOrder: (cartId = 'default', promoCode = '', shippingAddress = '') => {
     const params = new URLSearchParams();
     params.append('cart_id', cartId);
     if (promoCode) params.append('promo_code', promoCode);
+    if (shippingAddress) params.append('shipping_address', shippingAddress);
     return apiRequest('/checkout/place-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

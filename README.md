@@ -96,7 +96,7 @@ GitHub Codespaces already includes the main system tools. You still need to inst
 Clone the project and enter the repository:
 
 ```bash
-git clone https://github.com/sayantinakundu2002-lab/ISDE-2026-main.git
+git clone https://github.com/your-github-username/ISDE-2026-main.git
 cd ISDE-2026-main
 ```
 

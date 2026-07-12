@@ -11,7 +11,7 @@ DEFAULT_USERS = (
     {
         "username": "TestUser",
         "email": "testuser@gmail.com",
-        "password": "TestUser",
+        "password": "TesUser",
         "role": "user",
         "full_name": "TestUser",
     },

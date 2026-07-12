@@ -37,11 +37,13 @@ def checkout_summary(
 def place_order(
     cart_id: str = Form(...),
     promo_code: Optional[str] = Form(None),
-    shipping_address: str = Form("Not provided"),
+    shipping_address: Optional[str] = Form(None),
     user: dict = Depends(require_user)
 ):
     """Place an order from the cart. The order starts in CREATED state."""
-    cleaned_shipping_address = shipping_address.strip() if shipping_address and shipping_address.strip() else "Not provided"
+    if not shipping_address or not shipping_address.strip() or shipping_address.strip() == "Not provided":
+        raise HTTPException(status_code=400, detail="Shipping address is required")
+    cleaned_shipping_address = shipping_address.strip()
 
     # Use user's username as cart_id for user-scoped carts
     actual_cart_id = user["username"]
