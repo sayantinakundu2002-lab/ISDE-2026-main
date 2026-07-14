@@ -32,13 +32,21 @@ class OrderManager(metaclass=SingletonMeta):
                 items_rows = cursor.fetchall()
                 items = []
                 for it in items_rows:
-                    items.append({
+                    item_dict = {
                         "product_id": it["product_id"],
                         "name": it["name"],
                         "quantity": it["quantity"],
                         "unit_price": it["unit_price"],
                         "subtotal": it["subtotal"]
-                    })
+                    }
+                    # Include image_url if available
+                    try:
+                        img = it["image_url"]
+                        if img:
+                            item_dict["image_url"] = img
+                    except (IndexError, KeyError):
+                        pass
+                    items.append(item_dict)
                 
                 # Fetch history for this order
                 cursor.execute("SELECT * FROM order_history WHERE order_id = ? ORDER BY id ASC", (order_id,))
@@ -51,6 +59,13 @@ class OrderManager(metaclass=SingletonMeta):
                         "timestamp": hist["timestamp"]
                     })
                 
+                # Get seller_username (may be None for old orders)
+                seller_username = None
+                try:
+                    seller_username = r["seller_username"]
+                except (IndexError, KeyError):
+                    pass
+
                 # Reconstruct Order object
                 order = Order(
                     order_id=order_id,
@@ -63,7 +78,8 @@ class OrderManager(metaclass=SingletonMeta):
                     username=r["username"],
                     delivery_otp=r["delivery_otp"],
                     created_at=r["created_at"],
-                    shipping_address=r["shipping_address"] or ""
+                    shipping_address=r["shipping_address"] or "",
+                    seller_username=seller_username
                 )
                 order.state = OrderState(r["state"])
                 if history:
@@ -74,8 +90,8 @@ class OrderManager(metaclass=SingletonMeta):
         except Exception as e:
             logging.error(f"Error loading orders from DB: {e}")
 
-    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", shipping_address: str = "") -> Order:
-        """Create and persist an order with its shipping destination."""
+    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", shipping_address: str = "", seller_username: str = None) -> Order:
+        """Create and persist an order with its shipping destination and seller."""
         order_id = 'ORD-' + str(random.randint(10000000, 99999999))
         created_at = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
         
@@ -86,16 +102,16 @@ class OrderManager(metaclass=SingletonMeta):
             
             # Insert order main record
             cursor.execute("""
-            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, shipping_address, delivery_otp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, shipping_address, None))
+            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, shipping_address, delivery_otp, seller_username)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, shipping_address, None, seller_username))
             
             # Insert items
             for item in items:
                 cursor.execute("""
-                INSERT INTO order_items (order_id, product_id, name, quantity, unit_price, subtotal)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, (order_id, item["product_id"], item["name"], item["quantity"], item["unit_price"], item["subtotal"]))
+                INSERT INTO order_items (order_id, product_id, name, quantity, unit_price, subtotal, image_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (order_id, item["product_id"], item["name"], item["quantity"], item["unit_price"], item["subtotal"], item.get("image_url", "")))
                 
             # Insert initial state transition history
             cursor.execute("""
@@ -108,7 +124,7 @@ class OrderManager(metaclass=SingletonMeta):
         except Exception as e:
             logging.error(f"Error creating order in DB: {e}")
             
-        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username, created_at=created_at, shipping_address=shipping_address)
+        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username, created_at=created_at, shipping_address=shipping_address, seller_username=seller_username)
         self.orders[order_id] = order
         return order
 
@@ -128,6 +144,15 @@ class OrderManager(metaclass=SingletonMeta):
             if order.username == username
         ]
 
+    def get_admin_orders(self, admin_username: str) -> list:
+        """Return only orders where the seller_username matches the admin."""
+        self.load_from_db()
+        return [
+            order.to_dict()
+            for order in reversed(list(self.orders.values()))
+            if order.seller_username == admin_username
+        ]
+
     def transition_order(self, order_id: str, target_state_str: str) -> dict:
         self.load_from_db()
         order = self.orders.get(order_id)
@@ -136,7 +161,6 @@ class OrderManager(metaclass=SingletonMeta):
 
         target_state_upper = target_state_str.strip().upper()
         
-
 
         try:
             target_state = OrderState(target_state_upper)

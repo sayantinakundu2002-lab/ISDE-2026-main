@@ -31,7 +31,7 @@ _ALLOWED_TRANSITIONS = {
 class Order:
     """Represents a placed order with a finite-state transition model."""
 
-    def __init__(self, order_id: str, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", delivery_otp: str = None, created_at: str = None, shipping_address: str = ""):
+    def __init__(self, order_id: str, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", delivery_otp: str = None, created_at: str = None, shipping_address: str = "", seller_username: str = None):
         self.order_id = order_id
         self.items = items
         self.subtotal = subtotal
@@ -45,6 +45,7 @@ class Order:
         self.history = [{"from": None, "to": OrderState.CREATED.value, "timestamp": self.created_at}]
         self.delivery_otp = delivery_otp
         self.shipping_address = shipping_address
+        self.seller_username = seller_username
 
     def transition_to(self, target_state: OrderState) -> bool:
         """Attempt a state transition. Returns True if allowed, False otherwise."""
@@ -66,10 +67,40 @@ class Order:
 
     def to_dict(self) -> dict:
         """Serialize the order to a JSON-compatible dictionary."""
+        seller_name = "ISDE Seller"
+        seller_address = "Not Provided"
+
+        # Look up seller details using seller_username stored on the order
+        seller_user = self.seller_username
+        if seller_user:
+            from backend.database import get_db_connection
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT full_name, address FROM users WHERE username = ?", (seller_user,))
+                user_row = cursor.fetchone()
+                conn.close()
+                if user_row:
+                    seller_name = user_row["full_name"] or seller_user
+                    seller_address = user_row["address"] or "Not Provided"
+            except Exception:
+                pass
+
+        # Enrich items with image_url from inventory if not already present
+        enriched_items = []
+        from backend.managers import inventory_manager
+        for item in self.items:
+            enriched = dict(item)
+            if not enriched.get("image_url"):
+                prod = inventory_manager.get_product(item["product_id"])
+                if prod:
+                    enriched["image_url"] = prod.get("image_url", "")
+            enriched_items.append(enriched)
+
         return {
             "order_id": self.order_id,
             "state": self.state.value,
-            "items": self.items,
+            "items": enriched_items,
             "username": self.username,
             "subtotal": self.subtotal,
             "discount": self.discount,
@@ -81,6 +112,9 @@ class Order:
             "allowed_transitions": self.get_allowed_transitions(),
             "history": self.history,
             "delivery_otp": self.delivery_otp,
+            "seller_name": seller_name,
+            "seller_address": seller_address,
+            "seller_username": self.seller_username,
             "breakdown": {
                 "subtotal": self.subtotal,
                 "discount": self.discount,

@@ -323,5 +323,57 @@ export const api = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params
     });
-  }
+  },
+
+  requestDeliveryOtp: (orderId) => {
+    return apiRequest(`/orders/${encodeURIComponent(orderId)}/request-delivery-otp`, {
+      method: 'POST'
+    });
+  },
+
+  requestAdminRegister: (data) => {
+    const params = new URLSearchParams();
+    params.append('username', data.username);
+    params.append('password', data.password);
+    params.append('full_name', data.fullName);
+    params.append('email', data.email);
+    params.append('product_name', data.productName);
+    params.append('product_description', data.productDescription);
+    params.append('product_price', data.productPrice.toString());
+    params.append('product_stock', data.productStock.toString());
+    params.append('product_category', data.productCategory);
+    if (data.imageUrl) params.append('image_url', data.imageUrl);
+    return apiRequest('/auth/admin-register/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+  },
+
+  confirmAdminRegister: (username, confirmationCode) => {
+    const params = new URLSearchParams();
+    params.append('username', username);
+    params.append('confirmation_code', confirmationCode);
+    return apiRequest('/auth/admin-register/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+  },
+
+  updateSettings: (data) => {
+    const params = new URLSearchParams();
+    if (data.full_name !== undefined) params.append('full_name', data.full_name);
+    if (data.email !== undefined) params.append('email', data.email);
+    if (data.phone_number !== undefined) params.append('phone_number', data.phone_number);
+    if (data.profile_photo !== undefined) params.append('profile_photo', data.profile_photo);
+    if (data.address !== undefined) params.append('address', data.address);
+    return apiRequest('/auth/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+  },
+
+  getMe: () => apiRequest('/auth/me')
 };

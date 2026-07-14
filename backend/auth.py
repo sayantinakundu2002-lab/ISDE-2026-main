@@ -19,12 +19,36 @@ TOKENS = {}  # token -> username
 # --- Token management ---
 def create_token(username: str) -> str:
     token = uuid.uuid4().hex
+    import time
+    from backend.database import get_db_connection
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO tokens (token, username, created_at) VALUES (?, ?, ?)", (token, username, time.time()))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
     TOKENS[token] = username
     return token
 
 
 def get_user_from_token(token: str) -> Optional[dict]:
     username = TOKENS.get(token)
+    if not username:
+        from backend.database import get_db_connection
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT username FROM tokens WHERE token = ?", (token,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                username = row["username"]
+                TOKENS[token] = username  # cache in memory
+        except Exception:
+            pass
+            
     if username:
         from backend.database import get_db_connection
         try:

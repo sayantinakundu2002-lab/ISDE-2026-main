@@ -69,15 +69,15 @@ class InventoryManager(metaclass=SingletonMeta):
             
         return self.products.get(pid)
 
-    def add_product(self, name: str, description: str, price: float, stock: int, category: str, image_url: str, rating: Optional[float] = 4.0, discount_percent: Optional[float] = 0.0):
+    def add_product(self, name: str, description: str, price: float, stock: int, category: str, image_url: str, rating: Optional[float] = 4.0, discount_percent: Optional[float] = 0.0, listed_by: str = "TestAdmin"):
         try:
             from backend.database import get_db_connection
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-            INSERT INTO products (name, description, price, stock, category, image_url, rating, discount_percent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (name, description, price, stock, category, image_url, rating or 4.0, discount_percent or 0.0))
+            INSERT INTO products (name, description, price, stock, category, image_url, rating, discount_percent, listed_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (name, description, price, stock, category, image_url, rating or 4.0, discount_percent or 0.0, listed_by))
             new_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -95,7 +95,8 @@ class InventoryManager(metaclass=SingletonMeta):
             "category": category,
             "image_url": image_url,
             "rating": rating or 4.0,
-            "discount_percent": discount_percent or 0.0
+            "discount_percent": discount_percent or 0.0,
+            "listed_by": listed_by
         }
         self.products[new_id] = new_product
         self.notify_observers(new_id, 0, stock)

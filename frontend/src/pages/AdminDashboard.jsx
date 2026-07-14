@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { Link, useNavigate } from 'react-router-dom';
+import { api, getUser } from '../api';
 import {
   Package, RefreshCw, Plus, ChevronRight, ShoppingCart,
   CreditCard, Box, Truck, CheckCircle2, XCircle, LayoutDashboard,
@@ -27,8 +27,11 @@ const TRANSITION_LABELS = {
 };
 
 function AdminDashboard({ showToast, refreshProducts }) {
+  const navigate = useNavigate();
+  const currentUser = getUser();
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(null);
@@ -50,7 +53,11 @@ function AdminDashboard({ showToast, refreshProducts }) {
     setProductsLoading(true);
     try {
       const res = await api.listProducts();
-      setProducts(res.products || []);
+      const all = res.products || [];
+      setAllProducts(all);
+      // Filter to only show this admin's own products
+      const myProducts = all.filter(p => p.listed_by === currentUser?.username);
+      setProducts(myProducts);
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {
@@ -74,6 +81,11 @@ function AdminDashboard({ showToast, refreshProducts }) {
   };
 
   const handleTransition = async (orderId, targetState) => {
+    if (targetState === 'DELIVERED') {
+      showToast('OTP Required', 'Redirecting to verify delivery code...', 'info');
+      navigate(`/orders/${orderId}`);
+      return;
+    }
     setTransitioning(orderId);
     try {
       await api.transitionOrder(orderId, targetState);

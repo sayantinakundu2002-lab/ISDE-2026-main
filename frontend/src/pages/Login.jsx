@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api, setToken, setUser } from '../api';
 import { LogIn, UserPlus, Eye, EyeOff, Sparkles, ArrowRight, Shield, Mail, User, ShieldCheck } from 'lucide-react';
 
@@ -178,40 +178,7 @@ function Login({ onLogin, showToast }) {
                 </div>
               </div>
 
-              {/* Role Selector — only on Register */}
-              {isRegister && (
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Account Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setRole('user')}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all border-2 ${
-                        role === 'user'
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
-                      }`}
-                    >
-                      <User size={16} />
-                      Customer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole('admin')}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all border-2 ${
-                        role === 'admin'
-                          ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
-                      }`}
-                    >
-                      <ShieldCheck size={16} />
-                      Admin
-                    </button>
-                  </div>
-                </div>
-              )}
+
 
               <button
                 type="submit"
@@ -239,6 +206,15 @@ function Login({ onLogin, showToast }) {
                   <Shield size={14} className="text-purple-400" />
                   <span>Admin: <span className="font-mono font-semibold text-slate-500">TestAdmin</span> / Password: <span className="font-mono font-semibold text-slate-500">TestAdmin</span></span>
                 </div>
+              </div>
+            )}
+
+            {isRegister && (
+              <div className="mt-6 text-center text-xs text-slate-500 border-t border-slate-100 pt-4">
+                Want to register as a seller/admin?{' '}
+                <Link to="/admin-register" className="font-bold text-indigo-600 hover:underline">
+                  Apply here
+                </Link>
               </div>
             )}
           </div>

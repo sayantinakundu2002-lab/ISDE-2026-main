@@ -20,30 +20,30 @@ export default defineConfig({
     proxy: {
       // Proxy all backend API routes to FastAPI during development.
       // This makes API calls same-origin, fixing GitHub Codespaces sync issues.
-      '/products': 'http://localhost:8000',
+      '/products': 'http://127.0.0.1:8000',
       '/cart': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         bypass: htmlBypass
       },
       '/checkout': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         bypass: htmlBypass
       },
       '/orders': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         bypass: htmlBypass
       },
-      '/categories': 'http://localhost:8000',
-      '/upload': 'http://localhost:8000',
-      '/static': 'http://localhost:8000',
-      '/auth': 'http://localhost:8000',
+      '/categories': 'http://127.0.0.1:8000',
+      '/upload': 'http://127.0.0.1:8000',
+      '/static': 'http://127.0.0.1:8000',
+      '/auth': 'http://127.0.0.1:8000',
       '/admin': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         bypass: htmlBypass
       },
-      '/docs': 'http://localhost:8000',
-      '/openapi.json': 'http://localhost:8000',
-      '/redoc': 'http://localhost:8000',
+      '/docs': 'http://127.0.0.1:8000',
+      '/openapi.json': 'http://127.0.0.1:8000',
+      '/redoc': 'http://127.0.0.1:8000',
     },
   },
 })

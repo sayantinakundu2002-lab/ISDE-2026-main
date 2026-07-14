@@ -49,14 +49,16 @@ def view_cart(cart_id: str = "default", user: Optional[dict] = Depends(get_curre
     for pid, qty in cart.items():
         product = inventory_manager.get_product(pid)
         if product:
-            subtotal = product["price"] * qty
+            discount_pct = product.get("discount_percent", 0.0) or 0.0
+            unit_price = product["price"] * (1 - discount_pct / 100.0)
+            subtotal = unit_price * qty
             items.append({
                 "product_id": pid,
                 "name": product["name"],
                 "image_url": product["image_url"],
                 "quantity": qty,
-                "unit_price": product["price"],
-                "subtotal": subtotal
+                "unit_price": round(unit_price, 2),
+                "subtotal": round(subtotal, 2)
             })
             total += subtotal
 

@@ -13,8 +13,10 @@ import OrderDetail from './pages/OrderDetail';
 import InventoryLogs from './pages/InventoryLogs';
 import NotFound from './pages/NotFound';
 import Login from './pages/Login';
+import AdminRegister from './pages/AdminRegister';
 import AdminDashboard from './pages/AdminDashboard';
 import MyOrders from './pages/MyOrders';
+import Settings from './pages/Settings';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import TerminalLog from './components/TerminalLog';
 
@@ -277,6 +279,10 @@ function AppContent() {
             user ? <Navigate to={isAdmin ? '/admin' : '/'} replace /> :
             <Login onLogin={handleLogin} showToast={showToast} />
           } />
+          <Route path="/admin-register" element={
+            user ? <Navigate to={isAdmin ? '/admin' : '/'} replace /> :
+            <AdminRegister onLogin={handleLogin} showToast={showToast} />
+          } />
           <Route path="/product/:id" element={
             <ProductDetail
               onAddToCart={handleAddToCart}
@@ -328,7 +334,12 @@ function AppContent() {
               ? <Orders />
               : <Navigate to="/login" replace />
           } />
-          <Route path="/orders/:id" element={<OrderDetail />} />
+          <Route path="/orders/:id" element={<OrderDetail showToast={showToast} />} />
+          <Route path="/settings" element={
+            user
+              ? <Settings user={user} onUserUpdate={setUser} showToast={showToast} />
+              : <Navigate to="/login" replace />
+          } />
           <Route path="/inventory-logs" element={
             isAdmin
               ? <InventoryLogs />

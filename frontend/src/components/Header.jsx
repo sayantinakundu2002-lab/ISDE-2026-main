@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ShoppingBag, Search, Menu, X, Sparkles, Package, LogIn, LogOut, Shield, User, LayoutDashboard, Sun, Moon, Monitor, ClipboardList, Plus } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X, Sparkles, Package, LogIn, LogOut, Shield, User, LayoutDashboard, Sun, Moon, Monitor, ClipboardList, Plus, Settings } from 'lucide-react';
 
 function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout, theme, setTheme }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -90,6 +90,9 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
                     )}
                   </div>
                 </NavLink>
+                <NavLink to="/settings" className={navClass}>
+                  <Settings size={16} /> Settings
+                </NavLink>
               </>
             )}
             {isAdmin && (
@@ -105,6 +108,9 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
                 </NavLink>
                 <NavLink to="/add-product" className={navClass}>
                   <Plus size={16} /> Add Product
+                </NavLink>
+                <NavLink to="/settings" className={navClass}>
+                  <Settings size={16} /> Settings
                 </NavLink>
               </>
             )}
@@ -163,8 +169,12 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
                   isAdmin ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-50 text-slate-700 border border-slate-200'
                 }`}>
-                  {isAdmin ? <Shield size={14} /> : <User size={14} />}
-                  {user.full_name || user.username}
+                  {user.profile_photo ? (
+                    <img src={user.profile_photo} alt="Avatar" className="w-5 h-5 rounded-full object-cover border border-slate-300" />
+                  ) : (
+                    isAdmin ? <Shield size={14} /> : <User size={14} />
+                  )}
+                  <span>{user.full_name || user.username}</span>
                   {isAdmin && <span className="bg-indigo-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">ADMIN</span>}
                 </div>
                 <button
@@ -253,6 +263,9 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
                     </span>
                   )}
                 </NavLink>
+                <NavLink to="/settings" className="text-lg font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2">
+                  <Settings size={20} /> Settings
+                </NavLink>
               </>
             )}
             {isAdmin && (
@@ -262,6 +275,9 @@ function Header({ cartItemCount = 0, searchQuery, setSearchQuery, user, onLogout
                 </NavLink>
                 <NavLink to="/orders" className="text-lg font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2">
                   <Package size={20} /> Status Track
+                </NavLink>
+                <NavLink to="/settings" className="text-lg font-medium text-slate-600 hover:text-slate-900 flex items-center gap-2">
+                  <Settings size={20} /> Settings
                 </NavLink>
               </>
             )}

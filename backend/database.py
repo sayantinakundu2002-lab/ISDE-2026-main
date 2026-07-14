@@ -11,9 +11,12 @@ DEFAULT_USERS = (
     {
         "username": "TestUser",
         "email": "testuser@gmail.com",
-        "password": "TesUser",
+        "password": "TestUser",
         "role": "user",
         "full_name": "TestUser",
+        "phone_number": "123-456-7890",
+        "profile_photo": "",
+        "address": "123 Delivery Road, Test City",
     },
     {
         "username": "TestAdmin",
@@ -21,6 +24,9 @@ DEFAULT_USERS = (
         "password": "TestAdmin",
         "role": "admin",
         "full_name": "TestAdmin",
+        "phone_number": "987-654-3210",
+        "profile_photo": "",
+        "address": "100 Seller Blvd, E-commerce City",
     },
 )
 
@@ -33,6 +39,8 @@ RESET_TABLES = (
     "inventory_logs",
     "products",
     "users",
+    "admin_registration_requests",
+    "tokens",
 )
 
 def _hash_password(password: str) -> str:
@@ -56,7 +64,38 @@ def _create_schema(cursor):
         password TEXT,
         role TEXT,
         full_name TEXT,
-        is_verified INTEGER DEFAULT 1
+        is_verified INTEGER DEFAULT 1,
+        phone_number TEXT,
+        profile_photo TEXT,
+        address TEXT
+    )
+    """)
+    _ensure_column(cursor, "users", "phone_number", "TEXT")
+    _ensure_column(cursor, "users", "profile_photo", "TEXT")
+    _ensure_column(cursor, "users", "address", "TEXT")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS tokens (
+        token TEXT PRIMARY KEY,
+        username TEXT,
+        created_at REAL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS admin_registration_requests (
+        username TEXT PRIMARY KEY,
+        email TEXT,
+        password TEXT,
+        full_name TEXT,
+        product_name TEXT,
+        product_description TEXT,
+        product_price REAL,
+        product_stock INTEGER,
+        product_category TEXT,
+        image_url TEXT,
+        confirmation_code TEXT,
+        status TEXT DEFAULT 'PENDING'
     )
     """)
 
@@ -79,9 +118,11 @@ def _create_schema(cursor):
         category TEXT,
         image_url TEXT,
         rating REAL DEFAULT 4.0,
-        discount_percent REAL DEFAULT 0.0
+        discount_percent REAL DEFAULT 0.0,
+        listed_by TEXT DEFAULT 'TestAdmin'
     )
     """)
+    _ensure_column(cursor, "products", "listed_by", "TEXT DEFAULT 'TestAdmin'")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS carts (
@@ -104,10 +145,12 @@ def _create_schema(cursor):
         total REAL,
         created_at TEXT,
         shipping_address TEXT,
-        delivery_otp TEXT
+        delivery_otp TEXT,
+        seller_username TEXT
     )
     """)
     _ensure_column(cursor, "orders", "shipping_address", "TEXT")
+    _ensure_column(cursor, "orders", "seller_username", "TEXT")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS order_items (
@@ -117,9 +160,11 @@ def _create_schema(cursor):
         name TEXT,
         quantity INTEGER,
         unit_price REAL,
-        subtotal REAL
+        subtotal REAL,
+        image_url TEXT
     )
     """)
+    _ensure_column(cursor, "order_items", "image_url", "TEXT")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS order_history (
@@ -174,21 +219,27 @@ def _reset_runtime_data(cursor):
 def _ensure_default_users(cursor):
     for user in DEFAULT_USERS:
         cursor.execute("""
-        INSERT INTO users (username, email, password, role, full_name, is_verified)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, email, password, role, full_name, is_verified, phone_number, profile_photo, address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(username) DO UPDATE SET
             email = excluded.email,
             password = excluded.password,
             role = excluded.role,
             full_name = excluded.full_name,
-            is_verified = excluded.is_verified
+            is_verified = excluded.is_verified,
+            phone_number = COALESCE(users.phone_number, excluded.phone_number),
+            profile_photo = COALESCE(users.profile_photo, excluded.profile_photo),
+            address = COALESCE(users.address, excluded.address)
         """, (
             user["username"],
             user["email"],
             _hash_password(user["password"]),
             user["role"],
             user["full_name"],
-            1
+            1,
+            user.get("phone_number", ""),
+            user.get("profile_photo", ""),
+            user.get("address", "")
         ))
 
 

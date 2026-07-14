@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import {
   Package, ChevronRight, RefreshCw, ShoppingCart,
-  CreditCard, Box, Truck, CheckCircle2, XCircle
+  CreditCard, Box, Truck, CheckCircle2, XCircle, Download
 } from 'lucide-react';
 
 const STATE_CONFIG = {
@@ -16,6 +16,70 @@ const STATE_CONFIG = {
 };
 
 const LIFECYCLE_STEPS = ['CREATED', 'PAID', 'PACKED', 'SHIPPED', 'DELIVERED'];
+
+function downloadInvoice(order) {
+  const line = "==================================================";
+  const shortLine = "--------------------------------------------------";
+  
+  let billText = "";
+  billText += `${line}\n`;
+  billText += `               ISDE MINISHOP INVOICE              \n`;
+  billText += `${line}\n\n`;
+  billText += `Order ID:      ${order.order_id}\n`;
+  billText += `Date:          ${order.created_at}\n`;
+  billText += `Customer:      ${order.username}\n`;
+  billText += `Status:        ${order.state}\n`;
+  if (order.seller_name) {
+    billText += `Seller:        ${order.seller_name}\n`;
+  }
+  if (order.seller_address && order.seller_address !== "Not Provided") {
+    billText += `Shipped From:  ${order.seller_address}\n`;
+  }
+  if (order.shipping_address) {
+    billText += `Deliver To:    ${order.shipping_address}\n`;
+  }
+  billText += `\n${shortLine}\n`;
+  billText += ` ITEMS\n`;
+  billText += `${shortLine}\n`;
+  
+  order.items.forEach(item => {
+    const itemTotalStr = `$${(item.subtotal || 0).toFixed(2)}`;
+    const quantityStr = `${item.quantity} x $${(item.unit_price || 0).toFixed(2)}`;
+    billText += `${item.name.padEnd(30)} ${quantityStr.padStart(10)} ${itemTotalStr.padStart(8)}\n`;
+  });
+  
+  billText += `${shortLine}\n`;
+  billText += ` PRICE BREAKDOWN\n`;
+  billText += `${shortLine}\n`;
+  
+  const subtotal = order.breakdown?.subtotal || order.subtotal || 0;
+  const discount = order.breakdown?.discount || order.discount || 0;
+  const shipping = order.breakdown?.shipping || order.shipping || 0;
+  const tax = order.tax || 0;
+  const total = order.breakdown?.total || order.total || 0;
+  
+  billText += `Subtotal:`.padEnd(40) + ` $${subtotal.toFixed(2)}`.padStart(10) + `\n`;
+  if (discount > 0) {
+    billText += `Discount:`.padEnd(40) + `-$${discount.toFixed(2)}`.padStart(10) + `\n`;
+  }
+  billText += `Shipping:`.padEnd(40) + ` $${shipping.toFixed(2)}`.padStart(10) + `\n`;
+  billText += `Tax:`.padEnd(40) + ` $${tax.toFixed(2)}`.padStart(10) + `\n`;
+  billText += `${shortLine}\n`;
+  billText += `TOTAL DUE:`.padEnd(40) + ` $${total.toFixed(2)}`.padStart(10) + `\n`;
+  billText += `${line}\n\n`;
+  billText += `         Thank you for shopping with us!          \n`;
+  billText += `${line}\n`;
+
+  const blob = new Blob([billText], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `bill_${order.order_id}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 function MyOrders() {
   const [orders, setOrders] = useState([]);
@@ -114,12 +178,22 @@ function MyOrders() {
                         </div>
                       </div>
                     </div>
-                    <Link
-                      to={`/orders/${order.order_id}`}
-                      className="text-slate-400 hover:text-indigo-500 transition-colors shrink-0 flex items-center gap-1 text-xs font-semibold"
-                    >
-                      Details <ChevronRight size={16} />
-                    </Link>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => downloadInvoice(order)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-indigo-600 transition-colors text-xs font-semibold rounded-full active:scale-95 transition-all"
+                        title="Download Invoice PDF/Bill"
+                      >
+                        <Download size={12} />
+                        <span>Download Bill</span>
+                      </button>
+                      <Link
+                        to={`/orders/${order.order_id}`}
+                        className="text-slate-400 hover:text-indigo-500 transition-colors flex items-center gap-1 text-xs font-semibold"
+                      >
+                        Details <ChevronRight size={16} />
+                      </Link>
+                    </div>
                   </div>
 
                   {/* Status Message */}
@@ -168,7 +242,15 @@ function MyOrders() {
                   <div className="mt-4 pt-3 border-t border-slate-100">
                     <div className="flex flex-wrap gap-2">
                       {order.items?.slice(0, 3).map((item, idx) => (
-                        <span key={idx} className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-600">
+                        <span key={idx} className="inline-flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-600">
+                          {item.image_url && (
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              className="w-5 h-5 rounded object-contain bg-white"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          )}
                           {item.quantity}× {item.name}
                         </span>
                       ))}

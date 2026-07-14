@@ -76,7 +76,8 @@ def add_product(product: ProductCreate, admin: dict = Depends(require_admin)):
         category=product.category,
         image_url=product.image_url,
         rating=product.rating,
-        discount_percent=product.discount_percent
+        discount_percent=product.discount_percent,
+        listed_by=admin["username"]
     )
     return {"message": f"Product '{product.name}' added successfully", "product": new_product}
 
@@ -86,13 +87,18 @@ def update_product(product_id: int, updates: ProductUpdate, admin: dict = Depend
     product = inventory_manager.get_product(product_id)
     if not product:
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+    if product.get("listed_by") != admin["username"]:
+        raise HTTPException(status_code=403, detail="Access denied. You can only manage your own products.")
     updated = inventory_manager.update_product(product_id, updates.model_dump(exclude_none=True))
     return {"message": f"Product {product_id} updated", "product": updated}
 
 
 @router.delete("/products/{product_id}")
 def delete_product(product_id: int, admin: dict = Depends(require_admin)):
-    deleted = inventory_manager.delete_product(product_id)
-    if not deleted:
+    product = inventory_manager.get_product(product_id)
+    if not product:
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
+    if product.get("listed_by") != admin["username"]:
+        raise HTTPException(status_code=403, detail="Access denied. You can only manage your own products.")
+    deleted = inventory_manager.delete_product(product_id)
     return {"message": f"Product '{deleted['name']}' deleted successfully"}

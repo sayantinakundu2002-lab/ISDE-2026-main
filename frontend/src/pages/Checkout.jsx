@@ -19,6 +19,22 @@ function Checkout({ cart, loadCart, showToast }) {
   const [receipt, setReceipt] = useState(null);
   const [copied, setCopied] = useState(false);
   const [shippingAddress, setShippingAddress] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const data = await api.getMe();
+        setUserProfile(data);
+        if (data && data.address) {
+          setShippingAddress(data.address);
+        }
+      } catch (err) {
+        console.error("Failed to load user profile on checkout", err);
+      }
+    };
+    loadProfile();
+  }, []);
 
   // Load checkout summary when promo code or cart items change
   const fetchSummary = async (code = '') => {
@@ -143,6 +159,32 @@ function Checkout({ cart, loadCart, showToast }) {
             </h2>
             <div className="space-y-4">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Delivery Address</label>
+              {userProfile && userProfile.address && (
+                <div className="flex gap-3 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setShippingAddress(userProfile.address)}
+                    className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                      shippingAddress === userProfile.address
+                        ? 'bg-slate-900 border-slate-900 text-white shadow-md'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    <MapPin size={14} /> Use Saved Default Address
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShippingAddress('')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                      shippingAddress !== userProfile.address
+                        ? 'bg-slate-900 border-slate-900 text-white shadow-md'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    Custom Address
+                  </button>
+                </div>
+              )}
               <textarea
                 value={shippingAddress}
                 onChange={(e) => setShippingAddress(e.target.value)}
