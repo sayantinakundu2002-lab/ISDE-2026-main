@@ -69,15 +69,15 @@ class InventoryManager(metaclass=SingletonMeta):
             
         return self.products.get(pid)
 
-    def add_product(self, name: str, description: str, price: float, stock: int, category: str, image_url: str, rating: Optional[float] = 4.0, discount_percent: Optional[float] = 0.0, listed_by: str = "TestAdmin"):
+    def add_product(self, name: str, description: str, price: float, stock: int, category: str, image_url: str, rating: Optional[float] = 4.0, discount_percent: Optional[float] = 0.0, listed_by: str = "TestAdmin", listed_by_account_id: Optional[int] = None):
         try:
             from backend.database import get_db_connection
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-            INSERT INTO products (name, description, price, stock, category, image_url, rating, discount_percent, listed_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (name, description, price, stock, category, image_url, rating or 4.0, discount_percent or 0.0, listed_by))
+            INSERT INTO products (name, description, price, stock, category, image_url, rating, discount_percent, listed_by, listed_by_account_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (name, description, price, stock, category, image_url, rating or 4.0, discount_percent or 0.0, listed_by, listed_by_account_id))
             new_id = cursor.lastrowid
             conn.commit()
             conn.close()
@@ -96,7 +96,8 @@ class InventoryManager(metaclass=SingletonMeta):
             "image_url": image_url,
             "rating": rating or 4.0,
             "discount_percent": discount_percent or 0.0,
-            "listed_by": listed_by
+            "listed_by": listed_by,
+            "listed_by_account_id": listed_by_account_id
         }
         self.products[new_id] = new_product
         self.notify_observers(new_id, 0, stock)

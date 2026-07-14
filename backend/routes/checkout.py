@@ -9,9 +9,25 @@ from fastapi import APIRouter, Form, HTTPException, Depends
 
 from backend.managers import inventory_manager, cart_manager, order_manager
 from backend.config import get_checkout_context
-from backend.auth import require_user, require_admin, get_current_user
+from backend.auth import require_user, get_current_user, get_account_storage_key
 
 router = APIRouter()
+
+
+def _same_account(user: dict, account_id: int) -> bool:
+    return account_id is not None and user.get("account_id") == account_id
+
+
+def _is_order_customer(order, user: dict) -> bool:
+    if order.customer_account_id is not None:
+        return _same_account(user, order.customer_account_id)
+    return order.username == user["username"]
+
+
+def _is_order_seller(order, user: dict) -> bool:
+    if order.seller_account_id is not None:
+        return _same_account(user, order.seller_account_id)
+    return order.seller_username == user["username"]
 
 
 @router.get("/cart/checkout-summary")
@@ -21,7 +37,7 @@ def checkout_summary(
     user: Optional[dict] = Depends(get_current_user)
 ):
     """Compute bill breakdown for the current cart without placing an order."""
-    actual_cart_id = user["username"] if user else cart_id
+    actual_cart_id = get_account_storage_key(user) if user else cart_id
     cart = cart_manager.get_cart(actual_cart_id)
     original_subtotal = 0.0
     product_discount = 0.0
@@ -57,8 +73,8 @@ def place_order(
         raise HTTPException(status_code=400, detail="Shipping address is required")
     cleaned_shipping_address = shipping_address.strip()
 
-    # Use user's username as cart_id for user-scoped carts
-    actual_cart_id = user["username"]
+    # Use the account-scoped cart id so shared user/admin usernames do not collide.
+    actual_cart_id = get_account_storage_key(user)
     cart = cart_manager.get_cart(actual_cart_id)
     if not cart:
         # Fallback to provided cart_id
@@ -66,7 +82,7 @@ def place_order(
     if not cart:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
-    # Group items by listed_by admin
+    # Group items by seller account.
     by_admin = {}
     for pid, qty in list(cart.items()):
         prod = inventory_manager.get_product(pid)
@@ -76,14 +92,23 @@ def place_order(
             raise HTTPException(status_code=400, detail=f"Insufficient stock for {prod['name']}")
             
         admin_owner = prod.get("listed_by", "TestAdmin") or "TestAdmin"
-        if admin_owner not in by_admin:
-            by_admin[admin_owner] = []
-        by_admin[admin_owner].append((prod, qty))
+        admin_owner_account_id = prod.get("listed_by_account_id")
+        admin_key = admin_owner_account_id if admin_owner_account_id is not None else admin_owner
+        if admin_key not in by_admin:
+            by_admin[admin_key] = {
+                "seller_username": admin_owner,
+                "seller_account_id": admin_owner_account_id,
+                "items": [],
+            }
+        by_admin[admin_key]["items"].append((prod, qty))
 
     placed_orders = []
     all_combined_items = []
     
-    for admin_owner, group in by_admin.items():
+    for seller_group in by_admin.values():
+        admin_owner = seller_group["seller_username"]
+        seller_account_id = seller_group["seller_account_id"]
+        group = seller_group["items"]
         group_items = []
         group_subtotal = 0.0
         group_product_discount = 0.0
@@ -122,7 +147,9 @@ def place_order(
             total=bill["total"],
             username=user["username"],
             shipping_address=cleaned_shipping_address,
-            seller_username=admin_owner
+            seller_username=admin_owner,
+            customer_account_id=user.get("account_id"),
+            seller_account_id=seller_account_id
         )
         payment_result = order_manager.transition_order(order.order_id, "PAID")
         if not payment_result["success"]:
@@ -176,17 +203,17 @@ def place_order(
 def list_orders(user: dict = Depends(require_user)):
     """List orders — admin sees only orders containing their products, users see only their own."""
     if user["role"] == "admin":
-        orders_list = order_manager.get_admin_orders(user["username"])
+        orders_list = order_manager.get_admin_orders(user["username"], user.get("account_id"))
         for o in orders_list:
             o["allowed_transitions"] = [t for t in o["allowed_transitions"] if t != "CANCELLED"]
         return {"orders": orders_list}
-    return {"orders": order_manager.get_user_orders(user["username"])}
+    return {"orders": order_manager.get_user_orders(user["username"], user.get("account_id"))}
 
 
 @router.get("/orders/my")
 def list_my_orders(user: dict = Depends(require_user)):
     """List only the current user's orders."""
-    return {"orders": order_manager.get_user_orders(user["username"])}
+    return {"orders": order_manager.get_user_orders(user["username"], user.get("account_id"))}
 
 
 @router.get("/orders/{order_id}")
@@ -199,9 +226,9 @@ def get_order(order_id: str, user: dict = Depends(require_user)):
     # Non-admin users can only view their own orders
     # Admins can only view orders where they are the seller
     if user["role"] == "admin":
-        if order.seller_username != user["username"]:
+        if not _is_order_seller(order, user):
             raise HTTPException(status_code=403, detail="Access denied. You do not own any products in this order.")
-    elif order.username != user["username"]:
+    elif not _is_order_customer(order, user):
         raise HTTPException(status_code=403, detail="Access denied")
         
     order_dict = order.to_dict()
@@ -226,13 +253,13 @@ def transition_order(order_id: str, target_state: str = Form(...), user: dict = 
 
     # Enforce ownership for admin using seller_username
     if user["role"] == "admin":
-        if order.seller_username != user["username"]:
+        if not _is_order_seller(order, user):
             raise HTTPException(status_code=403, detail="Access denied. You do not own any products in this order.")
 
     if target_state_upper == "CANCELLED":
         if user["role"] == "admin":
             raise HTTPException(status_code=403, detail="Admins cannot cancel orders")
-        if order.username != user["username"]:
+        if not _is_order_customer(order, user):
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         if user["role"] != "admin":
@@ -250,23 +277,34 @@ def transition_order(order_id: str, target_state: str = Form(...), user: dict = 
 
 @router.post("/orders/{order_id}/request-delivery-otp")
 def request_delivery_otp(order_id: str, user: dict = Depends(require_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Access denied. Admins only.")
-        
     order = order_manager.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-        
-    # Enforce admin ownership using seller_username
-    if order.seller_username != user["username"]:
-        raise HTTPException(status_code=403, detail="Access denied. You do not own any products in this order.")
 
-    # Look up the order customer's real saved email address.
+    is_admin = user["role"] == "admin"
+    is_order_customer = _is_order_customer(order, user)
+
+    if is_admin and not _is_order_seller(order, user):
+        raise HTTPException(status_code=403, detail="Access denied. You do not own any products in this order.")
+    if not is_admin and not is_order_customer:
+        raise HTTPException(status_code=403, detail="Access denied. You can only request OTP for your own order.")
+    if "DELIVERED" not in order.get_allowed_transitions():
+        raise HTTPException(status_code=400, detail="Delivery OTP can only be requested after the order is shipped.")
+
+    # The OTP always goes to the actual order customer, so they can share it with the delivery person.
     import time
     from backend.database import get_db_connection
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT email, full_name FROM users WHERE username = ?", (order.username,))
+    if order.customer_account_id is not None:
+        cursor.execute("SELECT email, full_name FROM users WHERE account_id = ?", (order.customer_account_id,))
+    else:
+        cursor.execute("""
+        SELECT email, full_name FROM users
+        WHERE username = ?
+        ORDER BY CASE WHEN role = 'user' THEN 0 ELSE 1 END, account_id
+        LIMIT 1
+        """, (order.username,))
     customer_row = cursor.fetchone()
     if not customer_row:
         conn.close()
@@ -324,7 +362,7 @@ def request_delivery_otp(order_id: str, user: dict = Depends(require_user)):
     else:
         conn.close()
 
-    return {"success": True, "message": "Delivery OTP emailed to the customer successfully."}
+    return {"success": True, "message": "Delivery OTP emailed to the order customer successfully."}
 
 
 @router.post("/orders/{order_id}/verify-delivery")
@@ -342,7 +380,7 @@ def verify_delivery_otp(
         raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
         
     # Enforce admin ownership using seller_username
-    if order.seller_username != user["username"]:
+    if not _is_order_seller(order, user):
         raise HTTPException(status_code=403, detail="Access denied. You do not own any products in this order.")
         
     # Verify OTP

@@ -59,33 +59,41 @@ def get_db_connection():
 def _create_schema(cursor):
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        email TEXT,
+        account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT COLLATE NOCASE NOT NULL,
+        email TEXT COLLATE NOCASE NOT NULL,
         password TEXT,
-        role TEXT,
+        role TEXT NOT NULL,
         full_name TEXT,
         is_verified INTEGER DEFAULT 1,
         phone_number TEXT,
         profile_photo TEXT,
-        address TEXT
+        address TEXT,
+        UNIQUE(role, email)
     )
     """)
     _ensure_column(cursor, "users", "phone_number", "TEXT")
     _ensure_column(cursor, "users", "profile_photo", "TEXT")
     _ensure_column(cursor, "users", "address", "TEXT")
+    _migrate_users_to_role_scoped_identity(cursor)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS tokens (
         token TEXT PRIMARY KEY,
+        account_id INTEGER,
         username TEXT,
+        role TEXT,
         created_at REAL
     )
     """)
+    _ensure_column(cursor, "tokens", "account_id", "INTEGER")
+    _ensure_column(cursor, "tokens", "role", "TEXT")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS admin_registration_requests (
-        username TEXT PRIMARY KEY,
-        email TEXT,
+        request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        email TEXT COLLATE NOCASE,
         password TEXT,
         full_name TEXT,
         product_name TEXT,
@@ -97,6 +105,11 @@ def _create_schema(cursor):
         confirmation_code TEXT,
         status TEXT DEFAULT 'PENDING'
     )
+    """)
+    _migrate_admin_registration_requests(cursor)
+    cursor.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_registration_requests_email
+    ON admin_registration_requests(email)
     """)
 
     cursor.execute("""
@@ -119,10 +132,12 @@ def _create_schema(cursor):
         image_url TEXT,
         rating REAL DEFAULT 4.0,
         discount_percent REAL DEFAULT 0.0,
-        listed_by TEXT DEFAULT 'TestAdmin'
+        listed_by TEXT DEFAULT 'TestAdmin',
+        listed_by_account_id INTEGER
     )
     """)
     _ensure_column(cursor, "products", "listed_by", "TEXT DEFAULT 'TestAdmin'")
+    _ensure_column(cursor, "products", "listed_by_account_id", "INTEGER")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS carts (
@@ -146,11 +161,15 @@ def _create_schema(cursor):
         created_at TEXT,
         shipping_address TEXT,
         delivery_otp TEXT,
-        seller_username TEXT
+        seller_username TEXT,
+        customer_account_id INTEGER,
+        seller_account_id INTEGER
     )
     """)
     _ensure_column(cursor, "orders", "shipping_address", "TEXT")
     _ensure_column(cursor, "orders", "seller_username", "TEXT")
+    _ensure_column(cursor, "orders", "customer_account_id", "INTEGER")
+    _ensure_column(cursor, "orders", "seller_account_id", "INTEGER")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS order_items (
@@ -194,6 +213,8 @@ def _create_schema(cursor):
     )
     """)
 
+    _backfill_account_references(cursor)
+
 
 def _ensure_column(cursor, table_name: str, column_name: str, column_type: str):
     """Add a missing column to an existing SQLite table."""
@@ -201,6 +222,149 @@ def _ensure_column(cursor, table_name: str, column_name: str, column_type: str):
     existing_columns = {row["name"] for row in cursor.fetchall()}
     if column_name not in existing_columns:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+
+
+def _migrate_users_to_role_scoped_identity(cursor):
+    """Move old username-primary-key/user-role-unique tables to email-scoped accounts."""
+    cursor.execute("PRAGMA table_info(users)")
+    columns = {row["name"]: row for row in cursor.fetchall()}
+    username_pk = columns["username"]["pk"] if "username" in columns else 0
+    cursor.execute("PRAGMA index_list(users)")
+    unique_username_by_role = False
+    for index_row in cursor.fetchall():
+        if not index_row["unique"]:
+            continue
+        index_name = index_row["name"]
+        cursor.execute(f"PRAGMA index_info({index_name})")
+        index_columns = [row["name"] for row in cursor.fetchall()]
+        if index_columns == ["role", "username"]:
+            unique_username_by_role = True
+            break
+
+    if "account_id" in columns and username_pk == 0 and not unique_username_by_role:
+        return
+
+    cursor.execute("""
+    CREATE TABLE users_role_scoped (
+        account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT COLLATE NOCASE NOT NULL,
+        email TEXT COLLATE NOCASE NOT NULL,
+        password TEXT,
+        role TEXT NOT NULL,
+        full_name TEXT,
+        is_verified INTEGER DEFAULT 1,
+        phone_number TEXT,
+        profile_photo TEXT,
+        address TEXT,
+        UNIQUE(role, email)
+    )
+    """)
+
+    selectable_columns = {
+        "username": "username",
+        "email": "COALESCE(NULLIF(email, ''), username)",
+        "password": "password",
+        "role": "COALESCE(NULLIF(role, ''), 'user')",
+        "full_name": "COALESCE(NULLIF(full_name, ''), username)",
+        "is_verified": "COALESCE(is_verified, 1)",
+        "phone_number": "phone_number" if "phone_number" in columns else "''",
+        "profile_photo": "profile_photo" if "profile_photo" in columns else "''",
+        "address": "address" if "address" in columns else "''",
+    }
+    cursor.execute(f"""
+    INSERT OR IGNORE INTO users_role_scoped (
+        username, email, password, role, full_name, is_verified, phone_number, profile_photo, address
+    )
+    SELECT
+        {selectable_columns["username"]},
+        {selectable_columns["email"]},
+        {selectable_columns["password"]},
+        {selectable_columns["role"]},
+        {selectable_columns["full_name"]},
+        {selectable_columns["is_verified"]},
+        {selectable_columns["phone_number"]},
+        {selectable_columns["profile_photo"]},
+        {selectable_columns["address"]}
+    FROM users
+    """)
+    cursor.execute("DROP TABLE users")
+    cursor.execute("ALTER TABLE users_role_scoped RENAME TO users")
+
+
+def _migrate_admin_registration_requests(cursor):
+    """Move old username-primary-key admin requests to email-scoped requests."""
+    cursor.execute("PRAGMA table_info(admin_registration_requests)")
+    columns = {row["name"]: row for row in cursor.fetchall()}
+    username_pk = columns["username"]["pk"] if "username" in columns else 0
+    if "request_id" in columns and username_pk == 0:
+        return
+
+    cursor.execute("""
+    CREATE TABLE admin_registration_requests_new (
+        request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        email TEXT COLLATE NOCASE,
+        password TEXT,
+        full_name TEXT,
+        product_name TEXT,
+        product_description TEXT,
+        product_price REAL,
+        product_stock INTEGER,
+        product_category TEXT,
+        image_url TEXT,
+        confirmation_code TEXT,
+        status TEXT DEFAULT 'PENDING'
+    )
+    """)
+    cursor.execute("""
+    INSERT OR IGNORE INTO admin_registration_requests_new (
+        username, email, password, full_name,
+        product_name, product_description, product_price, product_stock, product_category,
+        image_url, confirmation_code, status
+    )
+    SELECT
+        username, email, password, full_name,
+        product_name, product_description, product_price, product_stock, product_category,
+        image_url, confirmation_code, status
+    FROM admin_registration_requests
+    """)
+    cursor.execute("DROP TABLE admin_registration_requests")
+    cursor.execute("ALTER TABLE admin_registration_requests_new RENAME TO admin_registration_requests")
+
+
+def _backfill_account_references(cursor):
+    cursor.execute("""
+    UPDATE products
+    SET listed_by_account_id = (
+        SELECT account_id FROM users
+        WHERE users.role = 'admin' AND users.username = products.listed_by
+        ORDER BY account_id
+        LIMIT 1
+    )
+    WHERE listed_by_account_id IS NULL
+    """)
+
+    cursor.execute("""
+    UPDATE orders
+    SET customer_account_id = (
+        SELECT account_id FROM users
+        WHERE users.role = 'user' AND users.username = orders.username
+        ORDER BY account_id
+        LIMIT 1
+    )
+    WHERE customer_account_id IS NULL
+    """)
+
+    cursor.execute("""
+    UPDATE orders
+    SET seller_account_id = (
+        SELECT account_id FROM users
+        WHERE users.role = 'admin' AND users.username = orders.seller_username
+        ORDER BY account_id
+        LIMIT 1
+    )
+    WHERE seller_account_id IS NULL
+    """)
 
 
 def _reset_runtime_data(cursor):
@@ -221,10 +385,9 @@ def _ensure_default_users(cursor):
         cursor.execute("""
         INSERT INTO users (username, email, password, role, full_name, is_verified, phone_number, profile_photo, address)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(username) DO UPDATE SET
-            email = excluded.email,
+        ON CONFLICT(role, email) DO UPDATE SET
+            username = excluded.username,
             password = excluded.password,
-            role = excluded.role,
             full_name = excluded.full_name,
             is_verified = excluded.is_verified,
             phone_number = COALESCE(users.phone_number, excluded.phone_number),

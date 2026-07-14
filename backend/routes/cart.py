@@ -5,15 +5,15 @@ from typing import Optional
 from fastapi import APIRouter, Form, Depends
 
 from backend.managers import inventory_manager, cart_manager
-from backend.auth import get_current_user
+from backend.auth import get_current_user, get_account_storage_key
 
 router = APIRouter()
 
 
 def _get_cart_id(user: Optional[dict], cart_id: str) -> str:
-    """Use username as cart_id when authenticated, otherwise use provided cart_id."""
+    """Use a role/account-scoped cart id when authenticated, otherwise use provided cart_id."""
     if user:
-        return user["username"]
+        return get_account_storage_key(user)
     return cart_id
 
 

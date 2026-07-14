@@ -77,9 +77,17 @@ def add_product(product: ProductCreate, admin: dict = Depends(require_admin)):
         image_url=product.image_url,
         rating=product.rating,
         discount_percent=product.discount_percent,
-        listed_by=admin["username"]
+        listed_by=admin["username"],
+        listed_by_account_id=admin.get("account_id")
     )
     return {"message": f"Product '{product.name}' added successfully", "product": new_product}
+
+
+def _owns_product(product: dict, admin: dict) -> bool:
+    product_owner_id = product.get("listed_by_account_id")
+    if product_owner_id is not None and admin.get("account_id") is not None:
+        return product_owner_id == admin.get("account_id")
+    return product.get("listed_by") == admin["username"]
 
 
 @router.put("/products/{product_id}")
@@ -87,7 +95,7 @@ def update_product(product_id: int, updates: ProductUpdate, admin: dict = Depend
     product = inventory_manager.get_product(product_id)
     if not product:
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
-    if product.get("listed_by") != admin["username"]:
+    if not _owns_product(product, admin):
         raise HTTPException(status_code=403, detail="Access denied. You can only manage your own products.")
     updated = inventory_manager.update_product(product_id, updates.model_dump(exclude_none=True))
     return {"message": f"Product {product_id} updated", "product": updated}
@@ -98,7 +106,7 @@ def delete_product(product_id: int, admin: dict = Depends(require_admin)):
     product = inventory_manager.get_product(product_id)
     if not product:
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
-    if product.get("listed_by") != admin["username"]:
+    if not _owns_product(product, admin):
         raise HTTPException(status_code=403, detail="Access denied. You can only manage your own products.")
     deleted = inventory_manager.delete_product(product_id)
     return {"message": f"Product '{deleted['name']}' deleted successfully"}

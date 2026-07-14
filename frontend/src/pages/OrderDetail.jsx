@@ -104,9 +104,13 @@ function OrderDetail({ showToast }) {
     setOtpLoading(true);
     setOtpError(null);
     try {
-      await api.requestDeliveryOtp(id);
-      setOtpRequested(true);
-      if (showToast) showToast('OTP Sent', 'Delivery OTP has been emailed to the customer.', 'info');
+      const res = await api.requestDeliveryOtp(id);
+      if (isAdmin) {
+        setOtpRequested(true);
+      }
+      if (showToast) {
+        showToast('OTP Sent', res.message || 'Delivery OTP has been emailed to the order customer.', 'info');
+      }
     } catch (err) {
       setOtpError(err.message || 'Failed to request OTP');
       if (showToast) showToast('Error', err.message || 'Failed to request OTP', 'error');
@@ -343,6 +347,23 @@ function OrderDetail({ showToast }) {
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {!isAdmin && order.allowed_transitions.includes('DELIVERED') && (
+            <div className="bg-white border border-green-100 rounded-2xl p-6 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-heading text-sm font-bold text-green-700 uppercase tracking-wider mb-1">Delivery OTP</h2>
+                <p className="text-xs text-slate-500">Email the verification code to your account and share it with the delivery person.</p>
+              </div>
+              <button
+                onClick={handleRequestOtp}
+                disabled={otpLoading}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-full active:scale-95 transition-all shadow-md disabled:opacity-50 shrink-0"
+              >
+                <CheckCircle2 size={16} />
+                {otpLoading ? 'Sending...' : 'Email Delivery OTP'}
+              </button>
             </div>
           )}
 

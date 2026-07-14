@@ -92,10 +92,11 @@ def login(username: str = Form(...), password: str = Form(...)):
     user = authenticate_user(username, password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid username/email or password")
-    token = create_token(user["username"])
+    token = create_token(user["username"], user["role"], user.get("account_id"))
     return {
         "token": token,
         "user": {
+            "account_id": user.get("account_id"),
             "username": user["username"],
             "email": user.get("email", user["username"]),
             "role": user["role"],
@@ -122,10 +123,11 @@ def register(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    token = create_token(username)
+    token = create_token(user["username"], user["role"], user.get("account_id"))
     return {
         "token": token,
         "user": {
+            "account_id": user.get("account_id"),
             "username": user["username"],
             "email": user.get("email", user["username"]),
             "role": user["role"],
@@ -147,23 +149,24 @@ def verify_otp(username: str = Form(...), otp_code: str = Form(...)):
         raise HTTPException(status_code=400, detail="Invalid OTP code")
         
     # Mark user as verified
-    cursor.execute("UPDATE users SET is_verified = 1 WHERE username = ?", (username,))
+    cursor.execute("UPDATE users SET is_verified = 1 WHERE username = ? AND role = 'user'", (username,))
     
     # Delete the used OTP
     cursor.execute("DELETE FROM otps WHERE email = ? AND purpose = 'registration'", (username,))
     
     # Retrieve user info to return a token
-    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT * FROM users WHERE username = ? AND role = 'user'", (username,))
     user = cursor.fetchone()
     conn.commit()
     conn.close()
     
     user_dict = dict(user)
-    token = create_token(username)
+    token = create_token(user_dict["username"], user_dict["role"], user_dict.get("account_id"))
     return {
         "message": "Verification successful!",
         "token": token,
         "user": {
+            "account_id": user_dict.get("account_id"),
             "username": user_dict["username"],
             "email": user_dict.get("email", user_dict["username"]),
             "role": user_dict["role"],
@@ -177,6 +180,7 @@ def get_me(user: dict = Depends(require_user)):
     """Get the currently logged-in user's info."""
     return {
         "username": user["username"],
+        "account_id": user.get("account_id"),
         "email": user.get("email", user["username"]),
         "role": user["role"],
         "full_name": user.get("full_name", user["username"]),
@@ -198,6 +202,19 @@ def update_settings(
     from backend.database import get_db_connection
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    if email is not None:
+        email = email.strip()
+        if not email or "@" not in email:
+            conn.close()
+            raise HTTPException(status_code=400, detail="A valid email address is required")
+        cursor.execute("""
+        SELECT 1 FROM users
+        WHERE role = ? AND email = ? AND account_id <> ?
+        """, (user["role"], email, user.get("account_id")))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail=f"{user['role'].title()} email already exists")
     
     # Update fields that are provided
     cursor.execute("""
@@ -207,12 +224,12 @@ def update_settings(
         phone_number = COALESCE(?, phone_number),
         profile_photo = COALESCE(?, profile_photo),
         address = COALESCE(?, address)
-    WHERE username = ?
-    """, (full_name, email, phone_number, profile_photo, address, user["username"]))
+    WHERE account_id = ?
+    """, (full_name, email, phone_number, profile_photo, address, user.get("account_id")))
     conn.commit()
     
     # Fetch updated user
-    cursor.execute("SELECT * FROM users WHERE username = ?", (user["username"],))
+    cursor.execute("SELECT * FROM users WHERE account_id = ?", (user.get("account_id"),))
     updated_row = cursor.fetchone()
     conn.close()
     
@@ -225,6 +242,7 @@ def update_settings(
         "message": "Settings updated successfully",
         "user": {
             "username": updated_user["username"],
+            "account_id": updated_user.get("account_id"),
             "email": updated_user["email"],
             "role": updated_user["role"],
             "full_name": updated_user["full_name"],
@@ -252,17 +270,23 @@ def request_admin_register(
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Check if username exists in users
-    cursor.execute("SELECT 1 FROM users WHERE username = ?", (username,))
+    username = username.strip()
+    email = email.strip()
+
+    if not email or "@" not in email:
+        conn.close()
+        raise HTTPException(status_code=400, detail="A valid email address is required")
+
+    # Admin emails must be unique among admins, but may match a customer account.
+    cursor.execute("SELECT 1 FROM users WHERE email = ? AND role = 'admin'", (email,))
     if cursor.fetchone():
         conn.close()
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=400, detail="Admin email already exists")
         
-    # Check if pending request exists
-    cursor.execute("SELECT 1 FROM admin_registration_requests WHERE username = ?", (username,))
+    cursor.execute("SELECT 1 FROM admin_registration_requests WHERE email = ?", (email,))
     if cursor.fetchone():
         conn.close()
-        raise HTTPException(status_code=400, detail="A registration request for this username is already pending")
+        raise HTTPException(status_code=400, detail="A registration request for this email is already pending")
         
     # Generate random confirmation code (6 character uppercase alphanumeric)
     code_chars = string.ascii_uppercase + string.digits
@@ -333,20 +357,25 @@ def confirm_admin_register(
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM admin_registration_requests WHERE username = ? AND status = 'PENDING'", (username,))
+    cursor.execute("""
+    SELECT * FROM admin_registration_requests
+    WHERE username = ? AND confirmation_code = ? AND status = 'PENDING'
+    """, (username.strip(), confirmation_code.strip()))
     row = cursor.fetchone()
     
     if not row:
         conn.close()
-        raise HTTPException(status_code=400, detail="No pending registration request found for this username")
+        raise HTTPException(status_code=400, detail="No pending registration request found for this username and confirmation code")
         
     req = dict(row)
-    if req["confirmation_code"] != confirmation_code.strip():
+
+    cursor.execute("SELECT 1 FROM users WHERE role = 'admin' AND email = ?", (req["email"],))
+    if cursor.fetchone():
         conn.close()
-        raise HTTPException(status_code=400, detail="Invalid confirmation code")
+        raise HTTPException(status_code=400, detail="Admin email already exists")
         
     # Mark as approved (delete from requests)
-    cursor.execute("DELETE FROM admin_registration_requests WHERE username = ?", (username,))
+    cursor.execute("DELETE FROM admin_registration_requests WHERE request_id = ?", (req["request_id"],))
     
     # Create the user as admin
     try:
@@ -354,6 +383,7 @@ def confirm_admin_register(
         INSERT INTO users (username, email, password, role, full_name, is_verified)
         VALUES (?, ?, ?, ?, ?, 1)
         """, (req["username"], req["email"], req["password"], "admin", req["full_name"]))
+        account_id = cursor.lastrowid
         conn.commit()
     except Exception as e:
         conn.close()
@@ -370,19 +400,21 @@ def confirm_admin_register(
             stock=req["product_stock"],
             category=req["product_category"],
             image_url=req["image_url"],
-            listed_by=req["username"]
+            listed_by=req["username"],
+            listed_by_account_id=account_id
         )
     except Exception as e:
         import logging
         logging.error(f"Failed to auto-add product on admin registration: {e}")
         
     # Log user in
-    token = create_token(username)
+    token = create_token(req["username"], "admin", account_id)
     return {
         "success": True,
         "message": "Admin registration confirmed and account created!",
         "token": token,
         "user": {
+            "account_id": account_id,
             "username": req["username"],
             "email": req["email"],
             "role": "admin",

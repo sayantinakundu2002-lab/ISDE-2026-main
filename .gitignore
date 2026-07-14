@@ -21,7 +21,7 @@ frontend/dist/
 dist/
 
 # Env local files
-.env
+
 .env.local
 .env.*.local
 *.log

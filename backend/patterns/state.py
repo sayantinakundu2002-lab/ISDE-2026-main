@@ -31,7 +31,7 @@ _ALLOWED_TRANSITIONS = {
 class Order:
     """Represents a placed order with a finite-state transition model."""
 
-    def __init__(self, order_id: str, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", delivery_otp: str = None, created_at: str = None, shipping_address: str = "", seller_username: str = None):
+    def __init__(self, order_id: str, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", delivery_otp: str = None, created_at: str = None, shipping_address: str = "", seller_username: str = None, customer_account_id: int = None, seller_account_id: int = None):
         self.order_id = order_id
         self.items = items
         self.subtotal = subtotal
@@ -46,6 +46,8 @@ class Order:
         self.delivery_otp = delivery_otp
         self.shipping_address = shipping_address
         self.seller_username = seller_username
+        self.customer_account_id = customer_account_id
+        self.seller_account_id = seller_account_id
 
     def transition_to(self, target_state: OrderState) -> bool:
         """Attempt a state transition. Returns True if allowed, False otherwise."""
@@ -77,7 +79,10 @@ class Order:
             try:
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT full_name, address FROM users WHERE username = ?", (seller_user,))
+                if self.seller_account_id:
+                    cursor.execute("SELECT full_name, address FROM users WHERE account_id = ? AND role = 'admin'", (self.seller_account_id,))
+                else:
+                    cursor.execute("SELECT full_name, address FROM users WHERE username = ? AND role = 'admin' ORDER BY account_id LIMIT 1", (seller_user,))
                 user_row = cursor.fetchone()
                 conn.close()
                 if user_row:
@@ -115,6 +120,8 @@ class Order:
             "seller_name": seller_name,
             "seller_address": seller_address,
             "seller_username": self.seller_username,
+            "customer_account_id": self.customer_account_id,
+            "seller_account_id": self.seller_account_id,
             "breakdown": {
                 "subtotal": self.subtotal,
                 "discount": self.discount,

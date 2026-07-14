@@ -436,6 +436,226 @@ def test_product_discount_checkout_calculation():
     assert r_login.json()["user"]["username"] == test_user
 
 
+def test_user_registration_rejects_duplicate_email_within_user_role():
+    first = client.post("/auth/register", data={
+        "username": "EmailUserOne",
+        "password": "userpass1",
+        "full_name": "Email User One",
+        "email": "shared-user@example.com",
+        "role": "user"
+    })
+    assert first.status_code == 200
+
+    duplicate = client.post("/auth/register", data={
+        "username": "EmailUserTwo",
+        "password": "userpass2",
+        "full_name": "Email User Two",
+        "email": "shared-user@example.com",
+        "role": "user"
+    })
+    assert duplicate.status_code == 400
+    assert duplicate.json()["detail"] == "User email already exists"
+
+
+def test_user_registration_allows_duplicate_username_with_distinct_emails():
+    first = client.post("/auth/register", data={
+        "username": "SharedName",
+        "password": "firstpass",
+        "full_name": "Shared Name One",
+        "email": "shared-name-one@example.com",
+        "role": "user"
+    })
+    assert first.status_code == 200
+
+    second = client.post("/auth/register", data={
+        "username": "SharedName",
+        "password": "secondpass",
+        "full_name": "Shared Name Two",
+        "email": "shared-name-two@example.com",
+        "role": "user"
+    })
+    assert second.status_code == 200
+
+    first_login = client.post("/auth/login", data={"username": "shared-name-one@example.com", "password": "firstpass"})
+    assert first_login.status_code == 200
+    assert first_login.json()["user"]["email"] == "shared-name-one@example.com"
+
+    second_login = client.post("/auth/login", data={"username": "shared-name-two@example.com", "password": "secondpass"})
+    assert second_login.status_code == 200
+    assert second_login.json()["user"]["email"] == "shared-name-two@example.com"
+
+
+def test_user_and_admin_can_share_username_and_email_across_roles():
+    req_res = client.post("/auth/admin-register/request", data={
+        "username": USER_USERNAME,
+        "password": "adminpassword",
+        "full_name": "Role Scoped Admin",
+        "email": "testuser@gmail.com",
+        "product_name": "Role Scoped Product",
+        "product_description": "Product for role-scoped identity test",
+        "product_price": 75.00,
+        "product_stock": 10,
+        "product_category": "electronics"
+    })
+    assert req_res.status_code == 200
+
+    from backend.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT confirmation_code FROM admin_registration_requests WHERE username = ?", (USER_USERNAME,))
+    code = cursor.fetchone()["confirmation_code"]
+    conn.close()
+
+    confirm_res = client.post("/auth/admin-register/confirm", data={
+        "username": USER_USERNAME,
+        "confirmation_code": code
+    })
+    assert confirm_res.status_code == 200
+    assert confirm_res.json()["user"]["role"] == "admin"
+
+    user_login = client.post("/auth/login", data={"username": USER_USERNAME, "password": USER_PASSWORD})
+    assert user_login.status_code == 200
+    assert user_login.json()["user"]["role"] == "user"
+
+    admin_login = client.post("/auth/login", data={"username": USER_USERNAME, "password": "adminpassword"})
+    assert admin_login.status_code == 200
+    assert admin_login.json()["user"]["role"] == "admin"
+
+
+def test_accounts_with_same_username_have_separate_carts():
+    product, _ = create_product("Shared Username Cart Product", stock=10, price=10.0)
+
+    user_login = client.post("/auth/login", data={"username": USER_USERNAME, "password": USER_PASSWORD})
+    assert user_login.status_code == 200
+    user_token = user_login.json()["token"]
+
+    req_res = client.post("/auth/admin-register/request", data={
+        "username": USER_USERNAME,
+        "password": "admincartpass",
+        "full_name": "Shared Cart Admin",
+        "email": "shared-cart-admin@example.com",
+        "product_name": "Shared Cart Admin Product",
+        "product_description": "Product for cart identity test",
+        "product_price": 50.00,
+        "product_stock": 10,
+        "product_category": "electronics"
+    })
+    assert req_res.status_code == 200
+
+    from backend.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT confirmation_code FROM admin_registration_requests WHERE email = ?", ("shared-cart-admin@example.com",))
+    code = cursor.fetchone()["confirmation_code"]
+    conn.close()
+
+    confirm_res = client.post("/auth/admin-register/confirm", data={
+        "username": USER_USERNAME,
+        "confirmation_code": code
+    })
+    assert confirm_res.status_code == 200
+    admin_token = confirm_res.json()["token"]
+
+    user_add = client.post(
+        "/cart/add",
+        data={"product_id": product["id"], "quantity": 1, "cart_id": "default"},
+        headers={"Authorization": f"Bearer {user_token}"}
+    )
+    assert user_add.status_code == 200
+
+    admin_add = client.post(
+        "/cart/add",
+        data={"product_id": product["id"], "quantity": 2, "cart_id": "default"},
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert admin_add.status_code == 200
+
+    user_cart = client.get("/cart?cart_id=default", headers={"Authorization": f"Bearer {user_token}"})
+    admin_cart = client.get("/cart?cart_id=default", headers={"Authorization": f"Bearer {admin_token}"})
+    assert user_cart.status_code == 200
+    assert admin_cart.status_code == 200
+    assert user_cart.json()["items"][0]["quantity"] == 1
+    assert admin_cart.json()["items"][0]["quantity"] == 2
+
+
+def test_admin_registration_allows_duplicate_username_with_distinct_emails():
+    first = client.post("/auth/admin-register/request", data={
+        "username": "SharedSeller",
+        "password": "adminpassword1",
+        "full_name": "Shared Seller One",
+        "email": "shared-seller-one@example.com",
+        "product_name": "Shared Seller One Product",
+        "product_description": "First seller product",
+        "product_price": 80.00,
+        "product_stock": 5,
+        "product_category": "electronics"
+    })
+    assert first.status_code == 200
+
+    second = client.post("/auth/admin-register/request", data={
+        "username": "SharedSeller",
+        "password": "adminpassword2",
+        "full_name": "Shared Seller Two",
+        "email": "shared-seller-two@example.com",
+        "product_name": "Shared Seller Two Product",
+        "product_description": "Second seller product",
+        "product_price": 90.00,
+        "product_stock": 5,
+        "product_category": "electronics"
+    })
+    assert second.status_code == 200
+
+    from backend.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT email, confirmation_code FROM admin_registration_requests WHERE username = ?", ("SharedSeller",))
+    codes = {row["email"]: row["confirmation_code"] for row in cursor.fetchall()}
+    conn.close()
+
+    first_confirm = client.post("/auth/admin-register/confirm", data={
+        "username": "SharedSeller",
+        "confirmation_code": codes["shared-seller-one@example.com"]
+    })
+    assert first_confirm.status_code == 200
+    assert first_confirm.json()["user"]["email"] == "shared-seller-one@example.com"
+
+    second_confirm = client.post("/auth/admin-register/confirm", data={
+        "username": "SharedSeller",
+        "confirmation_code": codes["shared-seller-two@example.com"]
+    })
+    assert second_confirm.status_code == 200
+    assert second_confirm.json()["user"]["email"] == "shared-seller-two@example.com"
+
+
+def test_admin_registration_rejects_duplicate_email_within_admin_role():
+    first = client.post("/auth/admin-register/request", data={
+        "username": "AdminEmailOne",
+        "password": "adminpassword1",
+        "full_name": "Admin Email One",
+        "email": "shared-admin@example.com",
+        "product_name": "Admin Email One Product",
+        "product_description": "First admin product",
+        "product_price": 80.00,
+        "product_stock": 5,
+        "product_category": "electronics"
+    })
+    assert first.status_code == 200
+
+    duplicate = client.post("/auth/admin-register/request", data={
+        "username": "AdminEmailTwo",
+        "password": "adminpassword2",
+        "full_name": "Admin Email Two",
+        "email": "shared-admin@example.com",
+        "product_name": "Admin Email Two Product",
+        "product_description": "Second admin product",
+        "product_price": 90.00,
+        "product_stock": 5,
+        "product_category": "electronics"
+    })
+    assert duplicate.status_code == 400
+    assert duplicate.json()["detail"] == "A registration request for this email is already pending"
+
+
 def test_order_delivery_direct_flow():
     product, admin_token = create_product("Checkout Product", stock=5)
 
@@ -495,6 +715,58 @@ def test_order_delivery_direct_flow():
     )
     assert verify_res.status_code == 200
     assert verify_res.json()["success"] is True
+    assert verify_res.json()["order"]["state"] == "DELIVERED"
+
+
+def test_order_customer_can_request_delivery_otp_for_own_shipped_order():
+    product, admin_token = create_product("Customer OTP Product", stock=5)
+    user_token = login_as_user()
+
+    cart_res = client.post(
+        "/cart/add",
+        data={"product_id": product["id"], "quantity": 1, "cart_id": "default"},
+        headers={"Authorization": f"Bearer {user_token}"}
+    )
+    assert cart_res.status_code == 200
+
+    checkout_res = client.post(
+        "/checkout/place-order",
+        data={"cart_id": "default", "shipping_address": "42 Customer Lane"},
+        headers={"Authorization": f"Bearer {user_token}"}
+    )
+    assert checkout_res.status_code == 200
+    order_id = checkout_res.json()["order_id"]
+
+    for state in ["PACKED", "SHIPPED"]:
+        r = client.post(
+            f"/orders/{order_id}/transition",
+            data={"target_state": state},
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert r.status_code == 200
+
+    req_otp = client.post(
+        f"/orders/{order_id}/request-delivery-otp",
+        headers={"Authorization": f"Bearer {user_token}"}
+    )
+    assert req_otp.status_code == 200
+    assert req_otp.json()["success"] is True
+
+    from backend.database import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT otp_code FROM otps WHERE email = ? AND purpose = 'delivery'", (order_id,))
+    row = cursor.fetchone()
+    assert row is not None
+    otp_code = row["otp_code"]
+    conn.close()
+
+    verify_res = client.post(
+        f"/orders/{order_id}/verify-delivery",
+        data={"otp_code": otp_code},
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert verify_res.status_code == 200
     assert verify_res.json()["order"]["state"] == "DELIVERED"
 
 

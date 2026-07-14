@@ -65,6 +65,13 @@ class OrderManager(metaclass=SingletonMeta):
                     seller_username = r["seller_username"]
                 except (IndexError, KeyError):
                     pass
+                customer_account_id = None
+                seller_account_id = None
+                try:
+                    customer_account_id = r["customer_account_id"]
+                    seller_account_id = r["seller_account_id"]
+                except (IndexError, KeyError):
+                    pass
 
                 # Reconstruct Order object
                 order = Order(
@@ -79,7 +86,9 @@ class OrderManager(metaclass=SingletonMeta):
                     delivery_otp=r["delivery_otp"],
                     created_at=r["created_at"],
                     shipping_address=r["shipping_address"] or "",
-                    seller_username=seller_username
+                    seller_username=seller_username,
+                    customer_account_id=customer_account_id,
+                    seller_account_id=seller_account_id
                 )
                 order.state = OrderState(r["state"])
                 if history:
@@ -90,7 +99,7 @@ class OrderManager(metaclass=SingletonMeta):
         except Exception as e:
             logging.error(f"Error loading orders from DB: {e}")
 
-    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", shipping_address: str = "", seller_username: str = None) -> Order:
+    def create_order(self, items: list, subtotal: float, discount: float, shipping: float, tax: float, total: float, username: str = "guest", shipping_address: str = "", seller_username: str = None, customer_account_id: int = None, seller_account_id: int = None) -> Order:
         """Create and persist an order with its shipping destination and seller."""
         order_id = 'ORD-' + str(random.randint(10000000, 99999999))
         created_at = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
@@ -102,9 +111,9 @@ class OrderManager(metaclass=SingletonMeta):
             
             # Insert order main record
             cursor.execute("""
-            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, shipping_address, delivery_otp, seller_username)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, shipping_address, None, seller_username))
+            INSERT INTO orders (order_id, username, state, subtotal, discount, shipping, tax, total, created_at, shipping_address, delivery_otp, seller_username, customer_account_id, seller_account_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (order_id, username, OrderState.CREATED.value, subtotal, discount, shipping, tax, total, created_at, shipping_address, None, seller_username, customer_account_id, seller_account_id))
             
             # Insert items
             for item in items:
@@ -124,7 +133,7 @@ class OrderManager(metaclass=SingletonMeta):
         except Exception as e:
             logging.error(f"Error creating order in DB: {e}")
             
-        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username, created_at=created_at, shipping_address=shipping_address, seller_username=seller_username)
+        order = Order(order_id, items, subtotal, discount, shipping, tax, total, username=username, created_at=created_at, shipping_address=shipping_address, seller_username=seller_username, customer_account_id=customer_account_id, seller_account_id=seller_account_id)
         self.orders[order_id] = order
         return order
 
@@ -136,21 +145,23 @@ class OrderManager(metaclass=SingletonMeta):
         self.load_from_db()
         return [order.to_dict() for order in reversed(list(self.orders.values()))]
 
-    def get_user_orders(self, username: str) -> list:
+    def get_user_orders(self, username: str, account_id: int = None) -> list:
         self.load_from_db()
         return [
             order.to_dict()
             for order in reversed(list(self.orders.values()))
-            if order.username == username
+            if (account_id is not None and order.customer_account_id == account_id)
+            or (order.customer_account_id is None and order.username == username)
         ]
 
-    def get_admin_orders(self, admin_username: str) -> list:
-        """Return only orders where the seller_username matches the admin."""
+    def get_admin_orders(self, admin_username: str, account_id: int = None) -> list:
+        """Return only orders where the seller identity matches the admin."""
         self.load_from_db()
         return [
             order.to_dict()
             for order in reversed(list(self.orders.values()))
-            if order.seller_username == admin_username
+            if (account_id is not None and order.seller_account_id == account_id)
+            or (order.seller_account_id is None and order.seller_username == admin_username)
         ]
 
     def transition_order(self, order_id: str, target_state_str: str) -> dict:
